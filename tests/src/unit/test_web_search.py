@@ -250,6 +250,35 @@ async def test_settings_endpoint_masks_credentials_and_can_clear(monkeypatch) ->
     assert web_search.credential_status()["kagi"] is False
 
 
+@pytest.mark.asyncio
+async def test_save_persists_submitted_enabled_flag(monkeypatch) -> None:
+    from ha_mcp.settings_ui import _handlers_web_search as handler_module
+
+    monkeypatch.setattr(
+        handler_module,
+        "get_global_settings",
+        lambda: type("Settings", (), {"enable_web_search": False})(),
+    )
+    handlers = build_web_search_handlers()
+
+    saved = await handlers["save_web_search"](
+        _json_request(
+            {
+                "enabled": True,
+                "default_provider": "kagi",
+                "safe_search": "moderate",
+                "max_results": 5,
+                "domain_allowlist": [],
+                "domain_blocklist": [],
+            }
+        )
+    )
+
+    assert saved.status_code == 200
+    # The submitted flag must round-trip, not be silently forced to False.
+    assert web_search.load_search_settings().enabled is True
+
+
 def test_tool_registration_is_opt_in(monkeypatch) -> None:
     settings = type("Settings", (), {"enable_web_search": False})()
     monkeypatch.setattr("ha_mcp.config.get_global_settings", lambda: settings)

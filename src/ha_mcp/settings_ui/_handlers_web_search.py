@@ -78,7 +78,7 @@ def _parse_settings(payload: dict[str, Any]) -> SearchSettings | None:
         or blocklist is None
     ):
         return None
-    return SearchSettings(False, provider, safe, maximum, allowlist, blocklist)
+    return SearchSettings(enabled, provider, safe, maximum, allowlist, blocklist)
 
 
 def _update_credentials(payload: dict[str, Any]) -> JSONResponse | None:
