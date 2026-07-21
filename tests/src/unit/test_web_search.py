@@ -119,17 +119,13 @@ async def test_google_safe_search_maps_on_to_active_off_to_off(monkeypatch) -> N
     monkeypatch.setattr(web_search.httpx, "AsyncClient", lambda **_kwargs: Client())
 
     web_search.save_search_settings(
-        web_search.SearchSettings(
-            enabled=True, default_provider="google", safe_search="on"
-        )
+        web_search.SearchSettings(default_provider="google", safe_search="on")
     )
     await web_search.search_web("q", "google", 5)
     assert captured["safe"] == "active"
 
     web_search.save_search_settings(
-        web_search.SearchSettings(
-            enabled=True, default_provider="google", safe_search="off"
-        )
+        web_search.SearchSettings(default_provider="google", safe_search="off")
     )
     await web_search.search_web("q", "google", 5)
     assert captured["safe"] == "off"
@@ -165,7 +161,6 @@ async def test_save_rejects_legacy_safe_search_value(monkeypatch) -> None:
 
 def test_domain_blocklist_overrides_allowlist() -> None:
     settings = web_search.SearchSettings(
-        enabled=True,
         domain_allowlist=("example.com",),
         domain_blocklist=("blocked.example.com",),
     )
@@ -185,7 +180,6 @@ def test_clean_domains_strips_scheme_port_and_path() -> None:
 
 def test_host_allowed_matches_domain_entered_with_scheme() -> None:
     settings = web_search.SearchSettings(
-        enabled=True,
         domain_allowlist=web_search._clean_domains(["http://example.com"]),
     )
 
@@ -200,7 +194,7 @@ async def test_kagi_search_normalizes_and_filters_results(monkeypatch) -> None:
 
     get_global_settings().enable_web_search = True
     web_search.save_search_settings(
-        web_search.SearchSettings(enabled=True, domain_allowlist=("allowed.test",))
+        web_search.SearchSettings(domain_allowlist=("allowed.test",))
     )
     web_search.save_credentials({"kagi": {"api_key": "secret"}})
 
@@ -256,9 +250,7 @@ async def test_kagi_request_uses_documented_contract(monkeypatch) -> None:
     from ha_mcp.config import get_global_settings
 
     get_global_settings().enable_web_search = True
-    web_search.save_search_settings(
-        web_search.SearchSettings(enabled=True, safe_search="on")
-    )
+    web_search.save_search_settings(web_search.SearchSettings(safe_search="on"))
     web_search.save_credentials({"kagi": {"api_key": "secret"}})
     captured = {}
 
@@ -293,7 +285,7 @@ async def test_kagi_error_response_surfaces_provider_message(monkeypatch) -> Non
     from ha_mcp.config import get_global_settings
 
     get_global_settings().enable_web_search = True
-    web_search.save_search_settings(web_search.SearchSettings(enabled=True))
+    web_search.save_search_settings(web_search.SearchSettings())
     web_search.save_credentials({"kagi": {"api_key": "bad-token"}})
 
     class Client:
@@ -363,7 +355,7 @@ async def test_provider_network_error_is_wrapped_as_provider_error(monkeypatch) 
     from ha_mcp.config import get_global_settings
 
     get_global_settings().enable_web_search = True
-    web_search.save_search_settings(web_search.SearchSettings(enabled=True))
+    web_search.save_search_settings(web_search.SearchSettings())
     web_search.save_credentials({"kagi": {"api_key": "secret"}})
 
     class Client:
@@ -391,7 +383,7 @@ async def test_provider_malformed_json_is_wrapped_as_provider_error(
     from ha_mcp.config import get_global_settings
 
     get_global_settings().enable_web_search = True
-    web_search.save_search_settings(web_search.SearchSettings(enabled=True))
+    web_search.save_search_settings(web_search.SearchSettings())
     web_search.save_credentials({"kagi": {"api_key": "secret"}})
 
     class Client:
@@ -412,7 +404,7 @@ async def test_provider_malformed_json_is_wrapped_as_provider_error(
 
 @pytest.mark.asyncio
 async def test_search_rejects_disabled_without_calling_provider() -> None:
-    web_search.save_search_settings(web_search.SearchSettings(enabled=False))
+    web_search.save_search_settings(web_search.SearchSettings())
 
     # The registration feature flag is the authoritative enablement control.
     from ha_mcp.config import get_global_settings
@@ -445,7 +437,7 @@ async def test_zero_limit_is_rejected_not_silently_replaced() -> None:
     from ha_mcp.config import get_global_settings
 
     get_global_settings().enable_web_search = True
-    web_search.save_search_settings(web_search.SearchSettings(enabled=True))
+    web_search.save_search_settings(web_search.SearchSettings())
     web_search.save_credentials({"kagi": {"api_key": "secret"}})
 
     with pytest.raises(web_search.WebSearchConfigurationError, match="at least 1"):
@@ -602,7 +594,7 @@ def test_atomic_write_uses_a_temp_path_unique_to_each_write(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_save_persists_submitted_enabled_flag(monkeypatch) -> None:
+async def test_save_does_not_persist_enabled_flag(monkeypatch, tmp_path) -> None:
     from ha_mcp.settings_ui import _handlers_web_search as handler_module
 
     monkeypatch.setattr(
@@ -626,8 +618,10 @@ async def test_save_persists_submitted_enabled_flag(monkeypatch) -> None:
     )
 
     assert saved.status_code == 200
-    # The submitted flag must round-trip, not be silently forced to False.
-    assert web_search.load_search_settings().enabled is True
+    # Enablement is controlled by /api/settings/features and must not be
+    # persisted in the web_search.json payload.
+    payload = json.loads((tmp_path / "web_search.json").read_text())
+    assert "enabled" not in payload
 
 
 @pytest.mark.asyncio

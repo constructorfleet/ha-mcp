@@ -79,7 +79,6 @@ def _parse_settings(payload: dict[str, Any]) -> SearchSettings | None:
     ):
         return None
     return SearchSettings(
-        enabled=enabled,
         default_provider=provider,
         safe_search=safe,
         max_results=maximum,

@@ -32,7 +32,6 @@ class WebSearchProviderError(RuntimeError):
 
 @dataclass(frozen=True)
 class SearchSettings:
-    enabled: bool = False
     default_provider: ProviderName = "kagi"
     safe_search: Literal["off", "on"] = "on"
     max_results: int = 5
@@ -173,7 +172,6 @@ def load_search_settings() -> SearchSettings:
             "Web-search max_results must be between 1 and 10."
         )
     return SearchSettings(
-        enabled=bool(raw.get("enabled", False)),
         default_provider=provider,
         safe_search=safe,
         max_results=maximum,
@@ -187,7 +185,6 @@ def save_search_settings(settings: SearchSettings) -> None:
         _data_path(_CONFIG_FILE),
         json.dumps(
             {
-                "enabled": settings.enabled,
                 "default_provider": settings.default_provider,
                 "safe_search": settings.safe_search,
                 "max_results": settings.max_results,
