@@ -225,13 +225,17 @@ def _host_allowed(url: str, settings: SearchSettings) -> bool:
 def _normalize_result(item: dict[str, Any], provider: ProviderName) -> dict[str, str]:
     if provider == "kagi":
         url = str(item.get("url", ""))
-        return {
+        result = {
             "title": str(item.get("title", "")),
             "url": url,
             "display_url": url,
             "snippet": str(item.get("snippet", "")),
             "provider": provider,
         }
+        time = item.get("time")
+        if time:
+            result["published_date"] = str(time)
+        return result
     url = str(item.get("link", ""))
     result = {
         "title": str(item.get("title", "")),
@@ -252,16 +256,34 @@ def _normalize_result(item: dict[str, Any], provider: ProviderName) -> dict[str,
 
 
 def _provider_items(
-    response: httpx.Response, label: str, key: str
+    response: httpx.Response, label: str, path: tuple[str, ...]
 ) -> list[dict[str, Any]]:
     try:
-        payload = response.json()
+        payload: Any = response.json()
     except json.JSONDecodeError as exc:
         raise WebSearchProviderError(
             f"{label} returned a malformed response."
         ) from exc
-    items = payload.get(key, []) if isinstance(payload, dict) else []
-    return items if isinstance(items, list) else []
+    for key in path:
+        payload = payload.get(key) if isinstance(payload, dict) else None
+    return payload if isinstance(payload, list) else []
+
+
+def _kagi_error_detail(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except json.JSONDecodeError:
+        return "no further detail available"
+    if not isinstance(payload, dict):
+        return "no further detail available"
+    # Kagi's own docs say the field is ``error``; the live API has been
+    # observed returning ``errors`` instead, so check both defensively.
+    errors = payload.get("error")
+    if not isinstance(errors, list):
+        errors = payload.get("errors")
+    if isinstance(errors, list) and errors and isinstance(errors[0], dict):
+        return str(errors[0].get("message") or "no further detail available")
+    return "no further detail available"
 
 
 async def search_web(
@@ -301,18 +323,24 @@ async def _search_kagi(
         raise WebSearchConfigurationError("Kagi API key is not configured.")
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(
+            response = await client.post(
                 "https://kagi.com/api/v1/search",
-                params={"q": query, "limit": limit},
-                headers={"Authorization": f"Bot {key}"},
+                json={
+                    "query": query,
+                    "workflow": "search",
+                    "limit": limit,
+                    "safe_search": settings.safe_search == "on",
+                },
+                headers={"Authorization": f"Bearer {key}"},
             )
     except httpx.HTTPError as exc:
         raise WebSearchProviderError(f"Kagi search request failed: {exc}") from exc
     if response.is_error:
         raise WebSearchProviderError(
-            f"Kagi search failed (HTTP {response.status_code})."
+            f"Kagi search failed (HTTP {response.status_code}): "
+            f"{_kagi_error_detail(response)}"
         )
-    return _provider_items(response, "Kagi", "data")
+    return _provider_items(response, "Kagi", ("data", "search"))
 
 
 async def _search_google(
@@ -343,4 +371,4 @@ async def _search_google(
         raise WebSearchProviderError(
             f"Google search failed (HTTP {response.status_code})."
         )
-    return _provider_items(response, "Google", "items")
+    return _provider_items(response, "Google", ("items",))

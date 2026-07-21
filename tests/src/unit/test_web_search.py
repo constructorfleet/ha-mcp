@@ -202,22 +202,24 @@ async def test_kagi_search_normalizes_and_filters_results(monkeypatch) -> None:
         async def __aexit__(self, *_args):
             return None
 
-        async def get(self, *_args, **_kwargs):
+        async def post(self, *_args, **_kwargs):
             return httpx.Response(
                 200,
                 json={
-                    "data": [
-                        {
-                            "title": "Allowed",
-                            "url": "https://allowed.test/a",
-                            "snippet": "yes",
-                        },
-                        {
-                            "title": "Blocked",
-                            "url": "https://other.test/a",
-                            "snippet": "no",
-                        },
-                    ]
+                    "data": {
+                        "search": [
+                            {
+                                "title": "Allowed",
+                                "url": "https://allowed.test/a",
+                                "snippet": "yes",
+                            },
+                            {
+                                "title": "Blocked",
+                                "url": "https://other.test/a",
+                                "snippet": "no",
+                            },
+                        ]
+                    }
                 },
             )
 
@@ -234,6 +236,85 @@ async def test_kagi_search_normalizes_and_filters_results(monkeypatch) -> None:
             "provider": "kagi",
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_kagi_request_uses_documented_contract(monkeypatch) -> None:
+    # Regression test for #web-search: the API is a POST with a JSON body
+    # and Bearer auth (verified against Kagi's real endpoint), not the GET
+    # + query-params + "Bot" auth this originally shipped with — which 404'd
+    # unconditionally regardless of the API key's validity.
+    from ha_mcp.config import get_global_settings
+
+    get_global_settings().enable_web_search = True
+    web_search.save_search_settings(
+        web_search.SearchSettings(enabled=True, safe_search="on")
+    )
+    web_search.save_credentials({"kagi": {"api_key": "secret"}})
+    captured = {}
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def post(self, url, *, json, headers):
+            captured["url"] = url
+            captured["json"] = json
+            captured["headers"] = headers
+            return httpx.Response(200, json={"data": {"search": []}})
+
+    monkeypatch.setattr(web_search.httpx, "AsyncClient", lambda **_kwargs: Client())
+    await web_search.search_web("lights", "kagi", 3)
+
+    assert captured["url"] == "https://kagi.com/api/v1/search"
+    assert captured["headers"]["Authorization"] == "Bearer secret"
+    assert captured["json"] == {
+        "query": "lights",
+        "workflow": "search",
+        "limit": 3,
+        "safe_search": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_kagi_error_response_surfaces_provider_message(monkeypatch) -> None:
+    from ha_mcp.config import get_global_settings
+
+    get_global_settings().enable_web_search = True
+    web_search.save_search_settings(web_search.SearchSettings(enabled=True))
+    web_search.save_credentials({"kagi": {"api_key": "bad-token"}})
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def post(self, *_args, **_kwargs):
+            return httpx.Response(
+                400,
+                json={
+                    "meta": {},
+                    "data": None,
+                    "errors": [
+                        {
+                            "code": "general.invalid_token",
+                            "message": "Token signature failed to verify.",
+                        }
+                    ],
+                },
+            )
+
+    monkeypatch.setattr(web_search.httpx, "AsyncClient", lambda **_kwargs: Client())
+
+    with pytest.raises(
+        web_search.WebSearchProviderError, match="Token signature failed to verify"
+    ):
+        await web_search.search_web("lights", "kagi", 5)
 
 
 def test_normalize_google_result_tolerates_null_pagemap() -> None:
@@ -267,7 +348,7 @@ async def test_provider_network_error_is_wrapped_as_provider_error(monkeypatch) 
         async def __aexit__(self, *_args):
             return None
 
-        async def get(self, *_args, **_kwargs):
+        async def post(self, *_args, **_kwargs):
             raise httpx.ConnectError("name resolution failed")
 
     monkeypatch.setattr(web_search.httpx, "AsyncClient", lambda **_kwargs: Client())
@@ -293,7 +374,7 @@ async def test_provider_malformed_json_is_wrapped_as_provider_error(monkeypatch)
         async def __aexit__(self, *_args):
             return None
 
-        async def get(self, *_args, **_kwargs):
+        async def post(self, *_args, **_kwargs):
             return httpx.Response(200, text="not json")
 
     monkeypatch.setattr(web_search.httpx, "AsyncClient", lambda **_kwargs: Client())
