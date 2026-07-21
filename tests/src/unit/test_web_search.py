@@ -28,6 +28,28 @@ def test_credentials_are_encrypted_and_never_returned(tmp_path) -> None:
     assert (tmp_path / ".web_search_credentials.key").stat().st_mode & 0o777 == 0o600
 
 
+def test_key_creation_writes_locked_down_key(tmp_path) -> None:
+    path = tmp_path / ".web_search_credentials.key"
+
+    key = web_search._create_key(path)
+
+    assert path.read_bytes() == key
+    assert len(key) == 44
+    assert path.stat().st_mode & 0o777 == 0o600
+
+
+def test_key_creation_preserves_existing_key_under_race(tmp_path) -> None:
+    path = tmp_path / ".web_search_credentials.key"
+    existing = web_search.Fernet.generate_key()
+    path.write_bytes(existing)
+
+    # _create_key models the branch a racing writer takes once the key file
+    # exists — it must return the existing key, never overwrite it (which would
+    # orphan credentials already encrypted under the first key).
+    assert web_search._create_key(path) == existing
+    assert path.read_bytes() == existing
+
+
 def test_domain_blocklist_overrides_allowlist() -> None:
     settings = web_search.SearchSettings(
         enabled=True,

@@ -56,13 +56,30 @@ def _atomic_write(path: Path, payload: bytes) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _create_key(path: Path) -> bytes:
+    """Create the credential key file, tolerating a concurrent creator.
+
+    Uses ``O_EXCL`` so only the first writer persists a key; a racing writer
+    that loses reads the winner's key instead of overwriting it — overwriting
+    would silently orphan any credentials already encrypted under the first key.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    candidate = Fernet.generate_key()
+    try:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return path.read_bytes()
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(candidate)
+    return candidate
+
+
 def _fernet() -> Fernet:
     path = _data_path(_KEY_FILE)
     try:
         key = path.read_bytes()
     except FileNotFoundError:
-        key = Fernet.generate_key()
-        _atomic_write(path, key)
+        key = _create_key(path)
     if len(key) != 44:
         raise WebSearchConfigurationError("Web-search credential key is invalid.")
     os.chmod(path, 0o600)
