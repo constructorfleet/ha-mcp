@@ -3864,8 +3864,18 @@ async function saveWebSearchSettings() {
     // search enabled with no valid provider configured.
     const response = await fetch('./api/settings/web-search', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
     if (!response.ok) throw new Error(await webSearchErrorDetail(response));
-    const featureResponse = await fetch('./api/settings/features', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({flags: {enable_web_search: payload.enabled}})});
-    if (!featureResponse.ok) throw new Error('could not update web-search enablement (' + await webSearchErrorDetail(featureResponse) + ')');
+    let enabledChanged = true;
+    if (webSearchBaseline) {
+      try {
+        enabledChanged = payload.enabled !== JSON.parse(webSearchBaseline).enabled;
+      } catch (_e) {
+        enabledChanged = true;
+      }
+    }
+    if (enabledChanged) {
+      const featureResponse = await fetch('./api/settings/features', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({flags: {enable_web_search: payload.enabled}})});
+      if (!featureResponse.ok) throw new Error('could not update web-search enablement (' + await webSearchErrorDetail(featureResponse) + ')');
+    }
     markRestartRequired();
     document.getElementById('web-search-kagi-key').value = '';
     document.getElementById('web-search-google-key').value = '';
