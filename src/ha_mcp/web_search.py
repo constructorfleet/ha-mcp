@@ -85,10 +85,24 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value
 
 
+def normalize_domain(value: str) -> str:
+    """Reduce a user-entered domain to a bare lowercase hostname.
+
+    Accepts bare hosts, ``host:port``, or full URLs so that a value pasted as
+    ``https://example.com/path`` still matches ``urlparse(url).hostname``.
+    """
+    text = value.strip().lower()
+    if not text:
+        return ""
+    if "//" not in text:
+        text = "//" + text
+    return urlparse(text).hostname or ""
+
+
 def _clean_domains(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise WebSearchConfigurationError("Domain lists must contain strings.")
-    return tuple(item.strip().lower() for item in value if item.strip())
+    return tuple(host for host in (normalize_domain(item) for item in value) if host)
 
 
 def load_search_settings() -> SearchSettings:

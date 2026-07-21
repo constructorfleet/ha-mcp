@@ -40,6 +40,25 @@ def test_domain_blocklist_overrides_allowlist() -> None:
     assert not web_search._host_allowed("https://other.example.net/path", settings)
 
 
+def test_clean_domains_strips_scheme_port_and_path() -> None:
+    # Users paste full URLs into the allow/block fields; the stored entry must
+    # reduce to the bare hostname so it can match urlparse(url).hostname.
+    assert web_search._clean_domains(
+        ["http://Example.com", "https://foo.test/path", "bar.test:8443", " baz.test "]
+    ) == ("example.com", "foo.test", "bar.test", "baz.test")
+
+
+def test_host_allowed_matches_domain_entered_with_scheme() -> None:
+    settings = web_search.SearchSettings(
+        enabled=True,
+        domain_allowlist=web_search._clean_domains(["http://example.com"]),
+    )
+
+    assert web_search._host_allowed("https://example.com/a", settings)
+    assert web_search._host_allowed("https://www.example.com/a", settings)
+    assert not web_search._host_allowed("https://other.test/a", settings)
+
+
 @pytest.mark.asyncio
 async def test_kagi_search_normalizes_and_filters_results(monkeypatch) -> None:
     from ha_mcp.config import get_global_settings

@@ -15,6 +15,7 @@ from ..web_search import (
     credential_status,
     load_credentials,
     load_search_settings,
+    normalize_domain,
     save_credentials,
     save_search_settings,
 )
@@ -56,7 +57,7 @@ def _string_list(payload: Any, name: str) -> tuple[str, ...] | None:
     value = payload.get(name, [])
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         return None
-    return tuple(item.strip().lower() for item in value if item.strip())
+    return tuple(host for host in (normalize_domain(item) for item in value) if host)
 
 
 def _parse_settings(payload: dict[str, Any]) -> SearchSettings | None:
