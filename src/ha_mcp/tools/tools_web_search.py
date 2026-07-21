@@ -65,9 +65,13 @@ class WebSearchTools:
                 )
             )
         except WebSearchProviderError as exc:
+            # SERVICE_CALL_FAILED, not CONNECTION_FAILED: this covers a
+            # declined request (bad key, exhausted quota) as well as a
+            # transport failure, and CONNECTION_FAILED means "cannot reach
+            # Home Assistant" everywhere else in this codebase.
             raise_tool_error(
                 create_error_response(
-                    ErrorCode.CONNECTION_FAILED,
+                    ErrorCode.SERVICE_CALL_FAILED,
                     str(exc),
                     suggestions=[
                         "Check the provider credential, quota, and network connection."

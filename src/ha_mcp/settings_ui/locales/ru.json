@@ -426,7 +426,7 @@
     "web_search.provider.kagi": "Kagi",
     "web_search.provider.google": "Google Programmable Search",
     "web_search.safe_search.label": "Безопасный поиск",
-    "web_search.safe_search.help": "Включает SafeSearch Google (API Google поддерживает только вкл/выкл). Kagi игнорирует эту настройку и следует настройкам безопасности аккаунта Kagi.",
+    "web_search.safe_search.help": "Скрывает материалы NSFW. Действует для обоих провайдеров (обе API поддерживают только вкл/выкл).",
     "web_search.safe_search.on": "Вкл",
     "web_search.safe_search.off": "Выкл",
     "web_search.max_results.label": "Максимум результатов",

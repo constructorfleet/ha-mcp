@@ -562,3 +562,51 @@ def test_tool_registration_is_opt_in(monkeypatch) -> None:
     settings.enable_web_search = True
     tools_web_search.register_web_search_tools(mcp, MagicMock())
     assert mcp.add_tool.call_args.args[0].__name__ == "ha_web_search"
+
+
+@pytest.mark.asyncio
+async def test_provider_failure_maps_to_service_call_failed(monkeypatch) -> None:
+    """A declined provider request must not be reported as CONNECTION_FAILED.
+
+    WebSearchProviderError covers both a transport failure and a provider that
+    answered with an error (bad key, exhausted quota). CONNECTION_FAILED means
+    "cannot reach Home Assistant" everywhere else in this codebase — its very
+    suggestions tell the user to check HOMEASSISTANT_URL — so an expired Kagi
+    token pointed people at the wrong system entirely.
+    """
+    import json as _json
+
+    from fastmcp.exceptions import ToolError
+
+    async def _boom(*_args, **_kwargs):
+        raise web_search.WebSearchProviderError("Kagi search failed (HTTP 401)")
+
+    monkeypatch.setattr(tools_web_search, "search_web", _boom)
+
+    with pytest.raises(ToolError) as excinfo:
+        await tools_web_search.WebSearchTools().ha_web_search("lights")
+
+    payload = _json.loads(str(excinfo.value))
+    assert payload["error"]["code"] == "SERVICE_CALL_FAILED"
+
+
+@pytest.mark.asyncio
+async def test_configuration_failure_maps_to_config_validation_failed(
+    monkeypatch,
+) -> None:
+    """The sibling path stays put — an unconfigured provider is a config
+    problem, not a failed call."""
+    import json as _json
+
+    from fastmcp.exceptions import ToolError
+
+    async def _boom(*_args, **_kwargs):
+        raise web_search.WebSearchConfigurationError("Kagi API key is not configured.")
+
+    monkeypatch.setattr(tools_web_search, "search_web", _boom)
+
+    with pytest.raises(ToolError) as excinfo:
+        await tools_web_search.WebSearchTools().ha_web_search("lights")
+
+    payload = _json.loads(str(excinfo.value))
+    assert payload["error"]["code"] == "CONFIG_VALIDATION_FAILED"
