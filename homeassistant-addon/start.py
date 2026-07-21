@@ -594,9 +594,7 @@ def main() -> int:
             enable_tool_search = (
                 raw_tool_search if isinstance(raw_tool_search, bool) else False
             )
-            enable_web_search = resolve_bool_option(
-                config, "enable_web_search", False
-            )
+            enable_web_search = resolve_bool_option(config, "enable_web_search", False)
             raw_tool_security_policies = config.get(
                 "enable_tool_security_policies", False
             )

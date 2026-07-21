@@ -284,9 +284,7 @@ def _provider_items(
     try:
         payload: Any = response.json()
     except json.JSONDecodeError as exc:
-        raise WebSearchProviderError(
-            f"{label} returned a malformed response."
-        ) from exc
+        raise WebSearchProviderError(f"{label} returned a malformed response.") from exc
     for key in path:
         payload = payload.get(key) if isinstance(payload, dict) else None
     return payload if isinstance(payload, list) else []

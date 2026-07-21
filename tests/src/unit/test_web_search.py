@@ -376,7 +376,9 @@ async def test_provider_network_error_is_wrapped_as_provider_error(monkeypatch) 
 
 
 @pytest.mark.asyncio
-async def test_provider_malformed_json_is_wrapped_as_provider_error(monkeypatch) -> None:
+async def test_provider_malformed_json_is_wrapped_as_provider_error(
+    monkeypatch,
+) -> None:
     from ha_mcp.config import get_global_settings
 
     get_global_settings().enable_web_search = True

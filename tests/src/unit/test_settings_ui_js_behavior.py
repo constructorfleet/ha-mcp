@@ -186,7 +186,14 @@ def _min_dom_row_tail(el_id: str) -> str | None:
             for value in _SELECT_OPTIONS[el_id]
         )
         return f'<select id="{el_id}">{options}</select>'
-    if el_id in ("web-search-max", "web-search-allow", "web-search-block", "web-search-kagi-key", "web-search-google-key", "web-search-google-engine"):
+    if el_id in (
+        "web-search-max",
+        "web-search-allow",
+        "web-search-block",
+        "web-search-kagi-key",
+        "web-search-google-key",
+        "web-search-google-engine",
+    ):
         return f'<input id="{el_id}" />'
     if el_id in ("policy-master-toggle", "read-only-mode-toggle"):
         return f'<input id="{el_id}" type="checkbox" />'
@@ -5630,9 +5637,7 @@ class TestWebSearchErrorReporting:
       document.body.dataset.text = st.textContent || '';
     """
 
-    def test_load_failure_surfaces_message_as_alert(
-        self, settings_script: str
-    ) -> None:
+    def test_load_failure_surfaces_message_as_alert(self, settings_script: str) -> None:
         result = self._run(
             settings_script,
             "await window.loadWebSearchSettings();" + self._READ_STATUS,
@@ -5640,9 +5645,7 @@ class TestWebSearchErrorReporting:
         assert "Google search-engine ID is required." in result.dom
         assert 'data-role="alert"' in result.dom
 
-    def test_save_failure_surfaces_message_as_alert(
-        self, settings_script: str
-    ) -> None:
+    def test_save_failure_surfaces_message_as_alert(self, settings_script: str) -> None:
         result = self._run(
             settings_script,
             "await window.saveWebSearchSettings();" + self._READ_STATUS,
