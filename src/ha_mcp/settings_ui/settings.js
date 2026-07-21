@@ -3787,11 +3787,32 @@ function updateWebSearchDirty() {
   document.getElementById('web-search-save').style.display = dirty ? '' : 'none';
 }
 
+// Pull the server's structured error message off a failed response so the
+// status line shows the actual reason (e.g. "engine_id is required for the
+// google provider") instead of a bare status code. Mirrors the
+// string-or-{message} shape the other settings flows already handle.
+async function webSearchErrorDetail(response) {
+  try {
+    const data = await response.json();
+    if (data && data.error) {
+      if (typeof data.error === 'string') return data.error;
+      if (data.error.message) return data.error.message;
+    }
+  } catch (_e) { /* non-JSON body — fall back to the status code */ }
+  return 'HTTP ' + response.status;
+}
+
+function webSearchFailure(status, message) {
+  setStatusAlert(status, true);
+  status.textContent = message;
+  showToast(message, {isError: true});
+}
+
 async function loadWebSearchSettings() {
   const status = document.getElementById('web-search-status');
   try {
     const response = await fetch('./api/settings/web-search');
-    if (!response.ok) throw new Error('HTTP ' + response.status);
+    if (!response.ok) throw new Error(await webSearchErrorDetail(response));
     const data = await response.json();
     document.getElementById('web-search-enabled').checked = !!data.enabled;
     document.getElementById('web-search-provider').value = data.default_provider;
@@ -3803,8 +3824,14 @@ async function loadWebSearchSettings() {
     document.getElementById('web-search-google-status').textContent = data.credentials.google ? 'Configured (encrypted at rest)' : 'Not configured';
     webSearchBaseline = webSearchSettingsSnapshot();
     updateWebSearchDirty();
+    // A prior failure may have left the span as role=alert with stale error
+    // text; a clean load clears both.
+    setStatusAlert(status, false);
+    status.textContent = '';
+    return true;
   } catch (error) {
-    status.textContent = 'Could not load web-search settings: ' + error.message;
+    webSearchFailure(status, 'Could not load web-search settings: ' + error.message);
+    return false;
   }
 }
 
@@ -3833,18 +3860,23 @@ async function saveWebSearchSettings() {
     // the flag were flipped first a rejected settings save would leave web
     // search enabled with no valid provider configured.
     const response = await fetch('./api/settings/web-search', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
-    if (!response.ok) throw new Error('HTTP ' + response.status);
+    if (!response.ok) throw new Error(await webSearchErrorDetail(response));
     const featureResponse = await fetch('./api/settings/features', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({flags: {enable_web_search: payload.enabled}})});
-    if (!featureResponse.ok) throw new Error('could not update web-search enablement (HTTP ' + featureResponse.status + ')');
-    status.textContent = 'Saved. Restart required.';
+    if (!featureResponse.ok) throw new Error('could not update web-search enablement (' + await webSearchErrorDetail(featureResponse) + ')');
     markRestartRequired();
     document.getElementById('web-search-kagi-key').value = '';
     document.getElementById('web-search-google-key').value = '';
     webSearchClearKagi = false;
     webSearchClearGoogle = false;
-    await loadWebSearchSettings();
+    // Reload first: it clears the status span, so the confirmation has to be
+    // written afterwards or it gets wiped. If the reload itself failed it has
+    // already put its own error in the span — don't paper over it, but still
+    // toast the save, which did succeed.
+    const reloaded = await loadWebSearchSettings();
+    if (reloaded) status.textContent = 'Saved. Restart required.';
+    showToast('Saved. Restart required.');
   } catch (error) {
-    status.textContent = 'Save failed: ' + error.message;
+    webSearchFailure(status, 'Save failed: ' + error.message);
   }
 }
 

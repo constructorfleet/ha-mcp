@@ -5587,3 +5587,71 @@ class TestWebSearchSaveOrdering:
             "enable_web_search feature flag must not be flipped when the "
             f"settings save is rejected; got {feature_posts}"
         )
+
+
+class TestWebSearchErrorReporting:
+    """Web-search load/save failures must surface the server's structured
+    error message and announce it as an alert.
+
+    The span started as role=status/polite and the handlers threw away the
+    JSON body, so a rejected request showed a bare "HTTP 400" and screen
+    readers never interrupted to announce it.
+    """
+
+    _REJECTED: ClassVar[dict] = {
+        "status": 400,
+        "json": {"error": {"message": "Google search-engine ID is required."}},
+    }
+
+    def _run(self, settings_script: str, invoke: str) -> HarnessResult:
+        return run_script(
+            settings_script,
+            initial_html=MIN_DOM,
+            fetch_map={**DEFAULT_FETCHES, "/api/settings/web-search": self._REJECTED},
+            invoke=invoke,
+        )
+
+    _READ_STATUS = """
+      const st = document.getElementById('web-search-status');
+      document.body.dataset.role = st.getAttribute('role') || '';
+      document.body.dataset.text = st.textContent || '';
+    """
+
+    def test_load_failure_surfaces_message_as_alert(
+        self, settings_script: str
+    ) -> None:
+        result = self._run(
+            settings_script,
+            "await window.loadWebSearchSettings();" + self._READ_STATUS,
+        )
+        assert "Google search-engine ID is required." in result.dom
+        assert 'data-role="alert"' in result.dom
+
+    def test_save_failure_surfaces_message_as_alert(
+        self, settings_script: str
+    ) -> None:
+        result = self._run(
+            settings_script,
+            "await window.saveWebSearchSettings();" + self._READ_STATUS,
+        )
+        assert "Google search-engine ID is required." in result.dom
+        assert 'data-role="alert"' in result.dom
+
+    def test_successful_load_clears_a_prior_alert(self, settings_script: str) -> None:
+        """A clean load must drop the stale error text and return the span to
+        the polite role — otherwise the alert sticks around forever."""
+        result = run_script(
+            settings_script,
+            initial_html=MIN_DOM,
+            fetch_map=DEFAULT_FETCHES,
+            invoke="""
+              const stale = document.getElementById('web-search-status');
+              stale.setAttribute('role', 'alert');
+              stale.textContent = 'stale failure text';
+              await window.loadWebSearchSettings();
+            """
+            + self._READ_STATUS,
+        )
+        _assert_clean_init(result)
+        assert 'data-role="status"' in result.dom
+        assert 'data-text=""' in result.dom
