@@ -33,7 +33,7 @@ class WebSearchProviderError(RuntimeError):
 class SearchSettings:
     enabled: bool = False
     default_provider: ProviderName = "kagi"
-    safe_search: Literal["off", "moderate", "strict"] = "moderate"
+    safe_search: Literal["off", "on"] = "on"
     max_results: int = 5
     domain_allowlist: tuple[str, ...] = ()
     domain_blocklist: tuple[str, ...] = ()
@@ -122,15 +122,25 @@ def _clean_domains(value: Any) -> tuple[str, ...]:
     return tuple(host for host in (normalize_domain(item) for item in value) if host)
 
 
+def _normalize_safe_search(value: Any) -> Literal["off", "on"]:
+    # Kagi ignores safe-search and Google's API is on/off only, so the retired
+    # three-tier model (off/moderate/strict) collapses to On/Off. Persisted
+    # legacy values migrate to "on" — they meant "safe search enabled".
+    coerced = {"moderate": "on", "strict": "on"}.get(value, value)
+    if coerced == "off":
+        return "off"
+    if coerced == "on":
+        return "on"
+    raise WebSearchConfigurationError("Web-search safe-search setting is invalid.")
+
+
 def load_search_settings() -> SearchSettings:
     raw = _read_json(_data_path(_CONFIG_FILE))
     provider = raw.get("default_provider", "kagi")
-    safe = raw.get("safe_search", "moderate")
+    safe = _normalize_safe_search(raw.get("safe_search", "on"))
     maximum = raw.get("max_results", 5)
-    if provider not in _PROVIDERS or safe not in ("off", "moderate", "strict"):
-        raise WebSearchConfigurationError(
-            "Web-search provider or safe-search setting is invalid."
-        )
+    if provider not in _PROVIDERS:
+        raise WebSearchConfigurationError("Web-search provider is invalid.")
     if (
         isinstance(maximum, bool)
         or not isinstance(maximum, int)
@@ -313,9 +323,8 @@ async def _search_google(
         raise WebSearchConfigurationError(
             "Google API key and search-engine ID are required."
         )
-    # Google's Custom Search ``safe`` parameter only accepts ``active``/``off``,
-    # so ``moderate`` and ``strict`` both map to ``active`` (see README).
-    safe = "active" if settings.safe_search != "off" else "off"
+    # Google's Custom Search ``safe`` parameter only accepts ``active``/``off``.
+    safe = "active" if settings.safe_search == "on" else "off"
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(

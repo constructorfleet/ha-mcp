@@ -73,7 +73,7 @@ def _parse_settings(payload: dict[str, Any]) -> SearchSettings | None:
         or not isinstance(maximum, int)
         or not 1 <= maximum <= 10
         or provider not in ("kagi", "google")
-        or safe not in ("off", "moderate", "strict")
+        or safe not in ("off", "on")
         or allowlist is None
         or blocklist is None
     ):

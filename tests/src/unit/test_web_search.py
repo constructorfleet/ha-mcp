@@ -50,6 +50,110 @@ def test_key_creation_preserves_existing_key_under_race(tmp_path) -> None:
     assert path.read_bytes() == existing
 
 
+def test_load_migrates_legacy_safe_search_tier_to_on(tmp_path) -> None:
+    # Kagi ignores safe-search and Google's API is on/off only, so the old
+    # three-tier model collapsed to On/Off. A persisted legacy value must
+    # migrate to "on" (it meant "safe search enabled"), not error out.
+    (tmp_path / "web_search.json").write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "default_provider": "kagi",
+                "safe_search": "strict",
+                "max_results": 5,
+                "domain_allowlist": [],
+                "domain_blocklist": [],
+            }
+        )
+    )
+
+    assert web_search.load_search_settings().safe_search == "on"
+
+
+def test_load_rejects_unknown_safe_search_value(tmp_path) -> None:
+    (tmp_path / "web_search.json").write_text(
+        json.dumps(
+            {
+                "enabled": True,
+                "default_provider": "kagi",
+                "safe_search": "banana",
+                "max_results": 5,
+                "domain_allowlist": [],
+                "domain_blocklist": [],
+            }
+        )
+    )
+
+    with pytest.raises(web_search.WebSearchConfigurationError):
+        web_search.load_search_settings()
+
+
+@pytest.mark.asyncio
+async def test_google_safe_search_maps_on_to_active_off_to_off(monkeypatch) -> None:
+    from ha_mcp.config import get_global_settings
+
+    get_global_settings().enable_web_search = True
+    web_search.save_credentials({"google": {"api_key": "k", "engine_id": "e"}})
+    captured: dict[str, str] = {}
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, *_args, params=None, **_kwargs):
+            captured["safe"] = params["safe"]
+            return httpx.Response(200, json={"items": []})
+
+    monkeypatch.setattr(web_search.httpx, "AsyncClient", lambda **_kwargs: Client())
+
+    web_search.save_search_settings(
+        web_search.SearchSettings(
+            enabled=True, default_provider="google", safe_search="on"
+        )
+    )
+    await web_search.search_web("q", "google", 5)
+    assert captured["safe"] == "active"
+
+    web_search.save_search_settings(
+        web_search.SearchSettings(
+            enabled=True, default_provider="google", safe_search="off"
+        )
+    )
+    await web_search.search_web("q", "google", 5)
+    assert captured["safe"] == "off"
+
+
+@pytest.mark.asyncio
+async def test_save_rejects_legacy_safe_search_value(monkeypatch) -> None:
+    from ha_mcp.settings_ui import _handlers_web_search as handler_module
+
+    monkeypatch.setattr(
+        handler_module,
+        "get_global_settings",
+        lambda: type("Settings", (), {"enable_web_search": False})(),
+    )
+    handlers = build_web_search_handlers()
+
+    saved = await handlers["save_web_search"](
+        _json_request(
+            {
+                "enabled": False,
+                "default_provider": "kagi",
+                "safe_search": "moderate",
+                "max_results": 5,
+                "domain_allowlist": [],
+                "domain_blocklist": [],
+            }
+        )
+    )
+
+    # The UI now offers only On/Off; the save API rejects the retired tiers.
+    assert saved.status_code == 400
+
+
 def test_domain_blocklist_overrides_allowlist() -> None:
     settings = web_search.SearchSettings(
         enabled=True,
@@ -260,7 +364,7 @@ async def test_settings_endpoint_masks_credentials_and_can_clear(monkeypatch) ->
             {
                 "enabled": False,
                 "default_provider": "kagi",
-                "safe_search": "moderate",
+                "safe_search": "on",
                 "max_results": 5,
                 "domain_allowlist": [],
                 "domain_blocklist": [],
@@ -288,7 +392,7 @@ async def test_save_persists_submitted_enabled_flag(monkeypatch) -> None:
             {
                 "enabled": True,
                 "default_provider": "kagi",
-                "safe_search": "moderate",
+                "safe_search": "on",
                 "max_results": 5,
                 "domain_allowlist": [],
                 "domain_blocklist": [],
@@ -325,7 +429,7 @@ async def test_save_returns_structured_error_when_credentials_corrupt(
             {
                 "enabled": False,
                 "default_provider": "kagi",
-                "safe_search": "moderate",
+                "safe_search": "on",
                 "max_results": 5,
                 "domain_allowlist": [],
                 "domain_blocklist": [],

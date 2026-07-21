@@ -383,11 +383,10 @@ Engine ID. Kagi needs an API key.
 The tool sends the query to the chosen provider and returns provider-supplied
 result snippets only. It does not retrieve result pages, synthesize summaries,
 or retain queries/results locally. Configure a default provider, a server-side
-result cap, safe-search level, and result-domain allow/block lists in the
-dashboard. Kagi safe-search behavior follows the configured Kagi account.
-Google's Custom Search API exposes only on/off filtering, so both **Strict**
-and **Moderate** enable Google SafeSearch (`safe=active`) and only **Off**
-disables it. Bing and DuckDuckGo are not
+result cap, safe-search On/Off, and result-domain allow/block lists in the
+dashboard. Safe search toggles Google SafeSearch (Google's API exposes only
+on/off); Kagi ignores it and follows the configured Kagi account. Bing and
+DuckDuckGo are not
 supported because they do not provide a suitable current public general-search
 API.
 

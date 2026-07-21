@@ -172,7 +172,7 @@ def _min_dom_row_tail(el_id: str) -> str | None:
     if el_id == "web-search-enabled":
         return f'<input id="{el_id}" type="checkbox" />'
     if el_id in ("web-search-provider", "web-search-safe"):
-        return f'<select id="{el_id}"><option value="kagi">Kagi</option><option value="google">Google</option><option value="strict">Strict</option><option value="moderate">Moderate</option><option value="off">Off</option></select>'
+        return f'<select id="{el_id}"><option value="kagi">Kagi</option><option value="google">Google</option><option value="on">On</option><option value="off">Off</option></select>'
     if el_id in ("web-search-max", "web-search-allow", "web-search-block", "web-search-kagi-key", "web-search-google-key", "web-search-google-engine"):
         return f'<input id="{el_id}" />'
     if el_id in ("policy-master-toggle", "read-only-mode-toggle"):
@@ -255,7 +255,7 @@ DEFAULT_FETCHES: dict[str, dict] = {
         "json": {
             "enabled": False,
             "default_provider": "kagi",
-            "safe_search": "moderate",
+            "safe_search": "on",
             "max_results": 5,
             "domain_allowlist": [],
             "domain_blocklist": [],
