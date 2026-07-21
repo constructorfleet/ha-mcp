@@ -20,6 +20,7 @@ class WebSearchTools:
             "readOnlyHint": True,
             "idempotentHint": True,
             "openWorldHint": True,
+            "title": "Search The Web",
         },
     )
     @log_tool_usage
