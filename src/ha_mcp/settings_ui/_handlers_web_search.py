@@ -81,6 +81,11 @@ def _parse_settings(payload: dict[str, Any]) -> SearchSettings | None:
     return SearchSettings(enabled, provider, safe, maximum, allowlist, blocklist)
 
 
+def _field(entry: dict[str, Any], name: str) -> str:
+    value = entry.get(name)
+    return value.strip() if isinstance(value, str) else ""
+
+
 def _update_credentials(payload: dict[str, Any]) -> JSONResponse | None:
     credentials = payload.get("credentials")
     if credentials is None:
@@ -97,20 +102,21 @@ def _update_credentials(payload: dict[str, Any]) -> JSONResponse | None:
         if entry.get("clear") is True:
             current.pop(provider_name, None)
             continue
-        api_key = entry.get("api_key")
-        engine_id = entry.get("engine_id")
-        if not isinstance(api_key, str) or not api_key.strip():
+        # A blank field means "keep what is stored": the UI leaves the API key
+        # box empty once a key is configured, so editing only the Google engine
+        # ID must not force the user to re-enter the secret.
+        stored = current.get(provider_name, {})
+        api_key = _field(entry, "api_key") or stored.get("api_key", "")
+        if not api_key:
             return _error(
                 f"{provider_name} API key is required when replacing credentials."
             )
-        if provider_name == "google" and (
-            not isinstance(engine_id, str) or not engine_id.strip()
-        ):
-            return _error("Google search-engine ID is required.")
-        current[provider_name] = {"api_key": api_key.strip()}
+        current[provider_name] = {"api_key": api_key}
         if provider_name == "google":
-            assert isinstance(engine_id, str)
-            current[provider_name]["engine_id"] = engine_id.strip()
+            engine_id = _field(entry, "engine_id") or stored.get("engine_id", "")
+            if not engine_id:
+                return _error("Google search-engine ID is required.")
+            current[provider_name]["engine_id"] = engine_id
     save_credentials(current)
     return None
 

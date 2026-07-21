@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -44,14 +45,23 @@ def _data_path(name: str) -> Path:
 
 
 def _atomic_write(path: Path, payload: bytes) -> None:
+    """Replace ``path`` atomically via a temp file unique to this write.
+
+    A shared ``<path>.tmp`` name lets concurrent writers truncate each other's
+    in-flight file and unlink it before the other's ``os.replace``, so each
+    write gets its own ``mkstemp`` name and cleans up only that name.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
+    fd, temporary_name = tempfile.mkstemp(
+        dir=path.parent, prefix=f"{path.name}.", suffix=".tmp"
+    )
+    temporary = Path(temporary_name)
     try:
-        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "wb") as handle:
             handle.write(payload)
+        # mkstemp creates at 0600 and os.replace swaps the inode, so the
+        # destination inherits those permissions without an extra chmod.
         os.replace(temporary, path)
-        os.chmod(path, 0o600)
     finally:
         temporary.unlink(missing_ok=True)
 

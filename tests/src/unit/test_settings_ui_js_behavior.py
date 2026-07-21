@@ -150,6 +150,15 @@ def _min_dom_row(el_id: str) -> str | None:
     return _min_dom_row_tail(el_id)
 
 
+# Each select carries only its own valid options, so a swapped or misdirected
+# assignment (the safe-search value written into the provider select) leaves the
+# value empty and fails the assertion instead of quietly passing.
+_SELECT_OPTIONS = {
+    "web-search-provider": ("kagi", "google"),
+    "web-search-safe": ("on", "off"),
+}
+
+
 def _min_dom_row_tail(el_id: str) -> str | None:
     """DOM stub markup for ``el_id`` (second half of the dispatch); None emits nothing."""
     if el_id in (
@@ -171,8 +180,12 @@ def _min_dom_row_tail(el_id: str) -> str | None:
         return '<input id="search" />'
     if el_id == "web-search-enabled":
         return f'<input id="{el_id}" type="checkbox" />'
-    if el_id in ("web-search-provider", "web-search-safe"):
-        return f'<select id="{el_id}"><option value="kagi">Kagi</option><option value="google">Google</option><option value="on">On</option><option value="off">Off</option></select>'
+    if el_id in _SELECT_OPTIONS:
+        options = "".join(
+            f'<option value="{value}">{value}</option>'
+            for value in _SELECT_OPTIONS[el_id]
+        )
+        return f'<select id="{el_id}">{options}</select>'
     if el_id in ("web-search-max", "web-search-allow", "web-search-block", "web-search-kagi-key", "web-search-google-key", "web-search-google-engine"):
         return f'<input id="{el_id}" />'
     if el_id in ("policy-master-toggle", "read-only-mode-toggle"):

@@ -488,6 +488,94 @@ async def test_settings_endpoint_masks_credentials_and_can_clear(monkeypatch) ->
 
 
 @pytest.mark.asyncio
+async def test_blank_api_key_keeps_stored_google_credential(monkeypatch) -> None:
+    from ha_mcp.settings_ui import _handlers_web_search as handler_module
+
+    monkeypatch.setattr(
+        handler_module,
+        "get_global_settings",
+        type("Settings", (), {"enable_web_search": False}),
+    )
+    web_search.save_credentials({"google": {"api_key": "stored", "engine_id": "old"}})
+    handlers = build_web_search_handlers()
+
+    # The UI leaves the key box blank once a key is configured, so editing only
+    # the engine ID posts an empty api_key — that must keep the stored secret,
+    # not reject the save.
+    saved = await handlers["save_web_search"](
+        _json_request(
+            {
+                "enabled": False,
+                "default_provider": "google",
+                "safe_search": "on",
+                "max_results": 5,
+                "domain_allowlist": [],
+                "domain_blocklist": [],
+                "credentials": {"google": {"api_key": "", "engine_id": "new"}},
+            }
+        )
+    )
+
+    assert saved.status_code == 200
+    assert web_search.load_credentials()["google"] == {
+        "api_key": "stored",
+        "engine_id": "new",
+    }
+
+
+@pytest.mark.asyncio
+async def test_blank_api_key_without_stored_credential_is_rejected(monkeypatch) -> None:
+    from ha_mcp.settings_ui import _handlers_web_search as handler_module
+
+    monkeypatch.setattr(
+        handler_module,
+        "get_global_settings",
+        type("Settings", (), {"enable_web_search": False}),
+    )
+    handlers = build_web_search_handlers()
+
+    saved = await handlers["save_web_search"](
+        _json_request(
+            {
+                "enabled": False,
+                "default_provider": "google",
+                "safe_search": "on",
+                "max_results": 5,
+                "domain_allowlist": [],
+                "domain_blocklist": [],
+                "credentials": {"google": {"api_key": "", "engine_id": "new"}},
+            }
+        )
+    )
+
+    assert saved.status_code == 400
+    assert web_search.credential_status()["google"] is False
+
+
+def test_atomic_write_uses_a_temp_path_unique_to_each_write(tmp_path) -> None:
+    target = tmp_path / "web_search.json"
+    observed: list[str] = []
+    real_replace = web_search.os.replace
+
+    def record(src, dst):
+        observed.append(str(src))
+        real_replace(src, dst)
+
+    web_search._atomic_write(target, b"first")
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(web_search.os, "replace", record)
+        web_search._atomic_write(target, b"second")
+        web_search._atomic_write(target, b"third")
+
+    # A shared "<path>.tmp" name lets concurrent writers truncate and unlink
+    # each other's in-flight file; distinct temp paths per write cannot.
+    assert len(set(observed)) == 2
+    assert target.read_bytes() == b"third"
+    assert target.stat().st_mode & 0o777 == 0o600
+    assert list(tmp_path.iterdir()) == [target]
+
+
+@pytest.mark.asyncio
 async def test_save_persists_submitted_enabled_flag(monkeypatch) -> None:
     from ha_mcp.settings_ui import _handlers_web_search as handler_module
 
