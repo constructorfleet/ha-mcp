@@ -125,13 +125,16 @@ async def _save_web_search(request: Request) -> JSONResponse:
     settings = _parse_settings(payload)
     if settings is None:
         return _error("Invalid web-search settings.")
-    credential_error = _update_credentials(payload)
-    if credential_error is not None:
-        return credential_error
-    save_search_settings(settings)
-    return JSONResponse(
-        {"success": True, "restart_required": True, **_settings_payload()}
-    )
+    try:
+        credential_error = _update_credentials(payload)
+        if credential_error is not None:
+            return credential_error
+        save_search_settings(settings)
+        return JSONResponse(
+            {"success": True, "restart_required": True, **_settings_payload()}
+        )
+    except WebSearchConfigurationError as exc:
+        return _error(str(exc), 409)
 
 
 def build_web_search_handlers() -> dict[str, Any]:

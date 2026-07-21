@@ -279,6 +279,41 @@ async def test_save_persists_submitted_enabled_flag(monkeypatch) -> None:
     assert web_search.load_search_settings().enabled is True
 
 
+@pytest.mark.asyncio
+async def test_save_returns_structured_error_when_credentials_corrupt(
+    monkeypatch, tmp_path
+) -> None:
+    from ha_mcp.settings_ui import _handlers_web_search as handler_module
+
+    monkeypatch.setattr(
+        handler_module,
+        "get_global_settings",
+        lambda: type("Settings", (), {"enable_web_search": False})(),
+    )
+    # A corrupt credentials store makes load_credentials() raise; the save
+    # handler must surface a structured 409 like the GET handler does, not a 500.
+    (tmp_path / "web_search_credentials.enc").write_text("not encrypted")
+    (tmp_path / ".web_search_credentials.key").write_bytes(
+        web_search.Fernet.generate_key()
+    )
+    handlers = build_web_search_handlers()
+
+    saved = await handlers["save_web_search"](
+        _json_request(
+            {
+                "enabled": False,
+                "default_provider": "kagi",
+                "safe_search": "moderate",
+                "max_results": 5,
+                "domain_allowlist": [],
+                "domain_blocklist": [],
+            }
+        )
+    )
+
+    assert saved.status_code == 409
+
+
 def test_tool_registration_is_opt_in(monkeypatch) -> None:
     settings = type("Settings", (), {"enable_web_search": False})()
     monkeypatch.setattr("ha_mcp.config.get_global_settings", lambda: settings)
