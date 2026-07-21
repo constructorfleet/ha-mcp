@@ -199,8 +199,12 @@ def _normalize_result(item: dict[str, Any], provider: ProviderName) -> dict[str,
         "snippet": str(item.get("snippet", "")),
         "provider": provider,
     }
-    if item.get("pagemap", {}).get("metatags"):
-        date = item["pagemap"]["metatags"][0].get("article:published_time")
+    # Google may return an explicit ``"pagemap": null`` (or omit metatags), so
+    # ``.get("pagemap", {})`` alone can yield None — normalize before indexing.
+    pagemap = item.get("pagemap")
+    metatags = pagemap.get("metatags") if isinstance(pagemap, dict) else None
+    if metatags:
+        date = metatags[0].get("article:published_time")
         if date:
             result["published_date"] = str(date)
     return result

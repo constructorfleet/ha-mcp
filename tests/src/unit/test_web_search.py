@@ -91,6 +91,22 @@ async def test_kagi_search_normalizes_and_filters_results(monkeypatch) -> None:
     ]
 
 
+def test_normalize_google_result_tolerates_null_pagemap() -> None:
+    # Google Custom Search can return an explicit ``"pagemap": null`` for items
+    # lacking metadata; ``dict.get(key, {})`` returns None (not {}) in that case.
+    item = {
+        "title": "T",
+        "link": "https://example.com/a",
+        "snippet": "s",
+        "pagemap": None,
+    }
+
+    result = web_search._normalize_result(item, "google")
+
+    assert result["url"] == "https://example.com/a"
+    assert "published_date" not in result
+
+
 @pytest.mark.asyncio
 async def test_search_rejects_disabled_without_calling_provider() -> None:
     web_search.save_search_settings(web_search.SearchSettings(enabled=False))
