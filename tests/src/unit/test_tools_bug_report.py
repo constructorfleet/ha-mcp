@@ -1624,6 +1624,10 @@ class TestBugReportNewIdentityFields:
             enable_dashboard_partial_tools=True,
             enable_tool_search=True,
             tool_search_max_results=7,
+            web_search_provider="duckduckgo",
+            web_search_allow_external=True,
+            web_search_include_error_keywords=True,
+            web_search_safe_search=True,
             enable_yaml_config_editing=False,
             # False here on purpose: exercises the end-to-end path for a toggle
             # that is present-but-False, which must still render (not be dropped).
