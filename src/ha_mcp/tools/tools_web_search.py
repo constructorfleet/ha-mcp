@@ -60,7 +60,7 @@ class WebSearchTools:
                     ErrorCode.CONFIG_VALIDATION_FAILED,
                     str(exc),
                     suggestions=[
-                        "Configure Web Search in Settings and restart the server."
+                        "Configure Web Search in Settings (restart is only required after enabling Web Search to register the tool)."
                     ],
                 )
             )
