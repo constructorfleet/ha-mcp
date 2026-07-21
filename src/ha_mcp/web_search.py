@@ -181,6 +181,8 @@ def load_search_settings() -> SearchSettings:
 
 
 def save_search_settings(settings: SearchSettings) -> None:
+    # Enablement is controlled by /api/settings/features; keep web_search.json
+    # limited to provider/runtime search behavior settings.
     _atomic_write(
         _data_path(_CONFIG_FILE),
         json.dumps(

@@ -61,15 +61,14 @@ def _string_list(payload: Any, name: str) -> tuple[str, ...] | None:
 
 
 def _parse_settings(payload: dict[str, Any]) -> SearchSettings | None:
-    enabled, maximum = payload.get("enabled"), payload.get("max_results")
+    maximum = payload.get("max_results")
     provider, safe = payload.get("default_provider"), payload.get("safe_search")
     allowlist, blocklist = (
         _string_list(payload, "domain_allowlist"),
         _string_list(payload, "domain_blocklist"),
     )
     if (
-        not isinstance(enabled, bool)
-        or isinstance(maximum, bool)
+        isinstance(maximum, bool)
         or not isinstance(maximum, int)
         or not 1 <= maximum <= 10
         or provider not in ("kagi", "google")
