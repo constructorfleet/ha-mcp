@@ -19,6 +19,14 @@ def isolated_web_search_dir(monkeypatch: pytest.MonkeyPatch, tmp_path):
     monkeypatch.setattr(web_search, "get_data_dir", lambda: tmp_path)
 
 
+@pytest.fixture(autouse=True)
+def _reset_settings_singleton():
+    from ha_mcp.config import _reset_global_settings
+
+    _reset_global_settings()
+    yield
+    _reset_global_settings()
+
 def test_credentials_are_encrypted_and_never_returned(tmp_path) -> None:
     web_search.save_credentials({"kagi": {"api_key": "very-secret"}})
 
