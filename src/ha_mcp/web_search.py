@@ -210,6 +210,19 @@ def _normalize_result(item: dict[str, Any], provider: ProviderName) -> dict[str,
     return result
 
 
+def _provider_items(
+    response: httpx.Response, label: str, key: str
+) -> list[dict[str, Any]]:
+    try:
+        payload = response.json()
+    except json.JSONDecodeError as exc:
+        raise WebSearchProviderError(
+            f"{label} returned a malformed response."
+        ) from exc
+    items = payload.get(key, []) if isinstance(payload, dict) else []
+    return items if isinstance(items, list) else []
+
+
 async def search_web(
     query: str, provider: ProviderName | None, limit: int | None
 ) -> dict[str, Any]:
@@ -245,18 +258,20 @@ async def _search_kagi(
     key = credentials.get("api_key")
     if not key:
         raise WebSearchConfigurationError("Kagi API key is not configured.")
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        response = await client.get(
-            "https://kagi.com/api/v1/search",
-            params={"q": query, "limit": limit},
-            headers={"Authorization": f"Bot {key}"},
-        )
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                "https://kagi.com/api/v1/search",
+                params={"q": query, "limit": limit},
+                headers={"Authorization": f"Bot {key}"},
+            )
+    except httpx.HTTPError as exc:
+        raise WebSearchProviderError(f"Kagi search request failed: {exc}") from exc
     if response.is_error:
         raise WebSearchProviderError(
             f"Kagi search failed (HTTP {response.status_code})."
         )
-    payload = response.json()
-    return payload.get("data", []) if isinstance(payload, dict) else []
+    return _provider_items(response, "Kagi", "data")
 
 
 async def _search_google(
@@ -267,21 +282,25 @@ async def _search_google(
         raise WebSearchConfigurationError(
             "Google API key and search-engine ID are required."
         )
+    # Google's Custom Search ``safe`` parameter only accepts ``active``/``off``,
+    # so ``moderate`` and ``strict`` both map to ``active`` (see README).
     safe = "active" if settings.safe_search != "off" else "off"
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        response = await client.get(
-            "https://customsearch.googleapis.com/customsearch/v1",
-            params={
-                "q": query,
-                "num": limit,
-                "safe": safe,
-                "key": key,
-                "cx": engine_id,
-            },
-        )
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(
+                "https://customsearch.googleapis.com/customsearch/v1",
+                params={
+                    "q": query,
+                    "num": limit,
+                    "safe": safe,
+                    "key": key,
+                    "cx": engine_id,
+                },
+            )
+    except httpx.HTTPError as exc:
+        raise WebSearchProviderError(f"Google search request failed: {exc}") from exc
     if response.is_error:
         raise WebSearchProviderError(
             f"Google search failed (HTTP {response.status_code})."
         )
-    payload = response.json()
-    return payload.get("items", []) if isinstance(payload, dict) else []
+    return _provider_items(response, "Google", "items")

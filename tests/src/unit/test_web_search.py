@@ -108,6 +108,56 @@ def test_normalize_google_result_tolerates_null_pagemap() -> None:
 
 
 @pytest.mark.asyncio
+async def test_provider_network_error_is_wrapped_as_provider_error(monkeypatch) -> None:
+    from ha_mcp.config import get_global_settings
+
+    get_global_settings().enable_web_search = True
+    web_search.save_search_settings(web_search.SearchSettings(enabled=True))
+    web_search.save_credentials({"kagi": {"api_key": "secret"}})
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, *_args, **_kwargs):
+            raise httpx.ConnectError("name resolution failed")
+
+    monkeypatch.setattr(web_search.httpx, "AsyncClient", lambda **_kwargs: Client())
+
+    # A raw httpx failure must surface as WebSearchProviderError (which the
+    # tool maps to a structured ToolError), not an unhandled exception.
+    with pytest.raises(web_search.WebSearchProviderError):
+        await web_search.search_web("lights", "kagi", 5)
+
+
+@pytest.mark.asyncio
+async def test_provider_malformed_json_is_wrapped_as_provider_error(monkeypatch) -> None:
+    from ha_mcp.config import get_global_settings
+
+    get_global_settings().enable_web_search = True
+    web_search.save_search_settings(web_search.SearchSettings(enabled=True))
+    web_search.save_credentials({"kagi": {"api_key": "secret"}})
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def get(self, *_args, **_kwargs):
+            return httpx.Response(200, text="not json")
+
+    monkeypatch.setattr(web_search.httpx, "AsyncClient", lambda **_kwargs: Client())
+
+    with pytest.raises(web_search.WebSearchProviderError):
+        await web_search.search_web("lights", "kagi", 5)
+
+
+@pytest.mark.asyncio
 async def test_search_rejects_disabled_without_calling_provider() -> None:
     web_search.save_search_settings(web_search.SearchSettings(enabled=False))
 
