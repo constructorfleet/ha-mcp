@@ -136,7 +136,7 @@ def _clean_domains(value: Any) -> tuple[str, ...]:
 
 
 def _normalize_safe_search(value: Any) -> Literal["off", "on"]:
-    # Kagi ignores safe-search and Google's API is on/off only, so the retired
+    # Kagi's API and Google's API are both on/off only, so the retired
     # three-tier model (off/moderate/strict) collapses to On/Off. Persisted
     # legacy values migrate to "on" — they meant "safe search enabled".
     coerced = {"moderate": "on", "strict": "on"}.get(value, value)
