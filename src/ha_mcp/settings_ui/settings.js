@@ -3757,6 +3757,73 @@ async function saveAdvancedSettings() {
 
 loadFeatureFlags();
 loadAdvancedSettings();
+
+function webSearchList(id) {
+  return document.getElementById(id).value.split(',').map(x => x.trim()).filter(Boolean);
+}
+
+let webSearchClearKagi = false;
+let webSearchClearGoogle = false;
+
+async function loadWebSearchSettings() {
+  const status = document.getElementById('web-search-status');
+  try {
+    const response = await fetch('./api/settings/web-search');
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const data = await response.json();
+    document.getElementById('web-search-enabled').checked = !!data.enabled;
+    document.getElementById('web-search-provider').value = data.default_provider;
+    document.getElementById('web-search-safe').value = data.safe_search;
+    document.getElementById('web-search-max').value = data.max_results;
+    document.getElementById('web-search-allow').value = (data.domain_allowlist || []).join(', ');
+    document.getElementById('web-search-block').value = (data.domain_blocklist || []).join(', ');
+    document.getElementById('web-search-kagi-status').textContent = data.credentials.kagi ? 'Configured (encrypted at rest)' : 'Not configured';
+    document.getElementById('web-search-google-status').textContent = data.credentials.google ? 'Configured (encrypted at rest)' : 'Not configured';
+  } catch (error) {
+    status.textContent = 'Could not load web-search settings: ' + error.message;
+  }
+}
+
+async function saveWebSearchSettings() {
+  const status = document.getElementById('web-search-status');
+  const kagiKey = document.getElementById('web-search-kagi-key').value;
+  const googleKey = document.getElementById('web-search-google-key').value;
+  const googleEngine = document.getElementById('web-search-google-engine').value;
+  const payload = {
+    enabled: document.getElementById('web-search-enabled').checked,
+    default_provider: document.getElementById('web-search-provider').value,
+    safe_search: document.getElementById('web-search-safe').value,
+    max_results: Number(document.getElementById('web-search-max').value),
+    domain_allowlist: webSearchList('web-search-allow'),
+    domain_blocklist: webSearchList('web-search-block'),
+  };
+  const credentials = {};
+  if (kagiKey) credentials.kagi = {api_key: kagiKey};
+  if (googleKey || googleEngine) credentials.google = {api_key: googleKey, engine_id: googleEngine};
+  if (webSearchClearKagi) credentials.kagi = {clear: true};
+  if (webSearchClearGoogle) credentials.google = {clear: true};
+  if (Object.keys(credentials).length) payload.credentials = credentials;
+  try {
+    const featureResponse = await fetch('./api/settings/features', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({flags: {enable_web_search: payload.enabled}})});
+    if (!featureResponse.ok) throw new Error('could not update web-search enablement (HTTP ' + featureResponse.status + ')');
+    const response = await fetch('./api/settings/web-search', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    status.textContent = 'Saved. Restart required.';
+    markRestartRequired();
+    document.getElementById('web-search-kagi-key').value = '';
+    document.getElementById('web-search-google-key').value = '';
+    webSearchClearKagi = false;
+    webSearchClearGoogle = false;
+    await loadWebSearchSettings();
+  } catch (error) {
+    status.textContent = 'Save failed: ' + error.message;
+  }
+}
+
+document.getElementById('web-search-save').addEventListener('click', saveWebSearchSettings);
+document.getElementById('web-search-clear-kagi').addEventListener('click', () => { webSearchClearKagi = true; document.getElementById('web-search-kagi-key').value = ''; });
+document.getElementById('web-search-clear-google').addEventListener('click', () => { webSearchClearGoogle = true; document.getElementById('web-search-google-key').value = ''; document.getElementById('web-search-google-engine').value = ''; });
+loadWebSearchSettings();
 loadTools();
 loadFsCustomPaths();
 

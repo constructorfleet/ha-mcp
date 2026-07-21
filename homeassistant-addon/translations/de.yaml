@@ -33,6 +33,12 @@ configuration:
       er die Tool-Liste neu lädt. Ein Neustart des Add-ons allein aktualisiert
       NICHT die gecachte Tool-Liste eines Clients; dies gilt nach jeder
       Einstellungsänderung hier.
+  enable_web_search:
+    name: Öffentliche Websuche aktivieren
+    description: >-
+      Registriert nach einem Neustart das optionale Werkzeug ha_web_search.
+      Kagi-/Google-Zugangsdaten und Datenschutzoptionen werden im
+      HA-MCP-Einstellungsdashboard konfiguriert.
   enable_tool_security_policies:
     name: Tool Security Policies aktivieren (erweitert)
     description: >-

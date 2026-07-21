@@ -97,6 +97,21 @@ _TOP_LEVEL_ELEMENT_IDS = [
     # Developer section (issue #1775) — bottom of panel-server; hosts the
     # dev-mode toggle whose enable path is confirm()-gated.
     "advDeveloper",
+    "web-search-enabled",
+    "web-search-provider",
+    "web-search-safe",
+    "web-search-max",
+    "web-search-allow",
+    "web-search-block",
+    "web-search-kagi-status",
+    "web-search-google-status",
+    "web-search-kagi-key",
+    "web-search-google-key",
+    "web-search-google-engine",
+    "web-search-status",
+    "web-search-save",
+    "web-search-clear-kagi",
+    "web-search-clear-google",
     # Beta features dedicated container — beta
     # master + sub-flags render here, NOT into featuresBody, so the
     # dangerous block sits at the bottom of panel-server.
@@ -143,6 +158,9 @@ def _min_dom_row_tail(el_id: str) -> str | None:
         "backupConfigSave",
         "backupRefresh",
         "backupBulkDelete",
+        "web-search-save",
+        "web-search-clear-kagi",
+        "web-search-clear-google",
     ):
         return f'<button id="{el_id}"></button>'
     if el_id == "restartNotice":
@@ -151,6 +169,12 @@ def _min_dom_row_tail(el_id: str) -> str | None:
         return None  # rendered as a child of restartNotice above
     if el_id == "search":
         return '<input id="search" />'
+    if el_id == "web-search-enabled":
+        return f'<input id="{el_id}" type="checkbox" />'
+    if el_id in ("web-search-provider", "web-search-safe"):
+        return f'<select id="{el_id}"><option value="kagi">Kagi</option><option value="google">Google</option><option value="strict">Strict</option><option value="moderate">Moderate</option><option value="off">Off</option></select>'
+    if el_id in ("web-search-max", "web-search-allow", "web-search-block", "web-search-kagi-key", "web-search-google-key", "web-search-google-engine"):
+        return f'<input id="{el_id}" />'
     if el_id in ("policy-master-toggle", "read-only-mode-toggle"):
         return f'<input id="{el_id}" type="checkbox" />'
     if el_id == "policy-save-global-btn":
@@ -225,6 +249,18 @@ DEFAULT_FETCHES: dict[str, dict] = {
     "/api/settings/backup-config": {
         "status": 200,
         "json": {},
+    },
+    "/api/settings/web-search": {
+        "status": 200,
+        "json": {
+            "enabled": False,
+            "default_provider": "kagi",
+            "safe_search": "moderate",
+            "max_results": 5,
+            "domain_allowlist": [],
+            "domain_blocklist": [],
+            "credentials": {"kagi": False, "google": False},
+        },
     },
 }
 

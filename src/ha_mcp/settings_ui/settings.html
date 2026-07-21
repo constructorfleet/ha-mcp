@@ -240,6 +240,22 @@
        need a restart to take effect (see the banner above). -->
   <div id="featuresBody"></div>
 
+  <h2 class="adv-section-title">Web search</h2>
+  <section class="adv-section" id="webSearchSettings" aria-label="Web search settings">
+    <p class="feature-help">When enabled, query text leaves this server for the selected provider. Results are provider snippets only; HA-MCP never fetches result pages or stores queries/results.</p>
+    <div class="feature-row"><div class="feature-info"><div class="feature-name">Enable web search</div><div class="feature-help">Registers ha_web_search after restart.</div></div><div class="feature-control"><label class="switch"><input type="checkbox" id="web-search-enabled"><span class="slider"></span></label></div></div>
+    <div class="adv-row"><div class="adv-info"><div class="adv-name">Default provider</div><div class="adv-help">Kagi and Google are API-only. Bing and DuckDuckGo are unavailable.</div></div><div class="adv-control"><select id="web-search-provider"><option value="kagi">Kagi</option><option value="google">Google Programmable Search</option></select></div></div>
+    <div class="adv-row"><div class="adv-info"><div class="adv-name">Safe search</div><div class="adv-help">Applied to Google requests. Kagi inherits the safety settings of the configured Kagi account.</div></div><div class="adv-control"><select id="web-search-safe"><option value="strict">Strict</option><option value="moderate">Moderate</option><option value="off">Off</option></select></div></div>
+    <div class="adv-row"><div class="adv-info"><div class="adv-name">Maximum results</div><div class="adv-help">Server-side cap (1–10).</div></div><div class="adv-control"><input id="web-search-max" type="number" min="1" max="10"></div></div>
+    <div class="adv-row"><div class="adv-info"><div class="adv-name">Allowed result domains</div><div class="adv-help">Comma-separated. Empty permits all domains unless blocked.</div></div><div class="adv-control"><input id="web-search-allow" type="text"></div></div>
+    <div class="adv-row"><div class="adv-info"><div class="adv-name">Blocked result domains</div><div class="adv-help">Comma-separated. Always takes precedence.</div></div><div class="adv-control"><input id="web-search-block" type="text"></div></div>
+    <h3>Credentials</h3>
+    <div class="adv-row"><div class="adv-info"><div class="adv-name">Kagi API key</div><div class="adv-help" id="web-search-kagi-status"></div></div><div class="adv-control"><input id="web-search-kagi-key" type="password" autocomplete="new-password"><button type="button" id="web-search-clear-kagi">Clear</button></div></div>
+    <div class="adv-row"><div class="adv-info"><div class="adv-name">Google API key</div><div class="adv-help" id="web-search-google-status"></div></div><div class="adv-control"><input id="web-search-google-key" type="password" autocomplete="new-password"><button type="button" id="web-search-clear-google">Clear</button></div></div>
+    <div class="adv-row"><div class="adv-info"><div class="adv-name">Google Programmable Search Engine ID</div></div><div class="adv-control"><input id="web-search-google-engine" type="text"></div></div>
+    <button id="web-search-save">Save web-search settings</button><span id="web-search-status" class="status" role="status"></span>
+  </section>
+
   <!-- Advanced settings sections. The "Connection
        (display only)" section was removed per user feedback — it
        just listed the read-only HOMEASSISTANT_URL / TOKEN /
