@@ -102,6 +102,16 @@ class Settings(BaseSettings):
     # Backup tool configuration
     backup_hint: str = Field("normal", alias="BACKUP_HINT")
 
+    # External web-search configuration used for duplicate-issue lookup URLs
+    # in ha_report_issue. Provider chooses the search engine; the remaining
+    # fields are privacy/safety knobs for what query detail is exposed.
+    web_search_provider: str = Field("duckduckgo", alias="WEB_SEARCH_PROVIDER")
+    web_search_allow_external: bool = Field(True, alias="WEB_SEARCH_ALLOW_EXTERNAL")
+    web_search_include_error_keywords: bool = Field(
+        True, alias="WEB_SEARCH_INCLUDE_ERROR_KEYWORDS"
+    )
+    web_search_safe_search: bool = Field(True, alias="WEB_SEARCH_SAFE_SEARCH")
+
     # WebSocket configuration (essential for async operations)
     enable_websocket: bool = Field(True, alias="ENABLE_WEBSOCKET")
 
@@ -520,6 +530,16 @@ class Settings(BaseSettings):
             raise ValueError(f"Backup hint must be one of {valid_hints}")
         return v.lower()
 
+    @field_validator("web_search_provider")
+    @classmethod
+    def validate_web_search_provider(cls, v: str) -> str:
+        """Ensure duplicate-search provider is valid."""
+        valid_providers = ["duckduckgo", "kagi", "google", "bing"]
+        provider = v.lower()
+        if provider not in valid_providers:
+            raise ValueError(f"Web search provider must be one of {valid_providers}")
+        return provider
+
     @field_validator("sidecar_pin_port", mode="before")
     @classmethod
     def _lenient_sidecar_pin_port(cls, v: object) -> int:
@@ -846,6 +866,18 @@ ADVANCED_SETTINGS_FIELDS: tuple[AdvancedField, ...] = (
         "operations",
         True,
     ),
+    AdvancedField("web_search_provider", "WEB_SEARCH_PROVIDER", str, "search", True),
+    AdvancedField(
+        "web_search_allow_external", "WEB_SEARCH_ALLOW_EXTERNAL", bool, "search", True
+    ),
+    AdvancedField(
+        "web_search_include_error_keywords",
+        "WEB_SEARCH_INCLUDE_ERROR_KEYWORDS",
+        bool,
+        "search",
+        True,
+    ),
+    AdvancedField("web_search_safe_search", "WEB_SEARCH_SAFE_SEARCH", bool, "search", True),
     AdvancedField(
         "enabled_tool_modules", "ENABLED_TOOL_MODULES", str, "tools_surface", True
     ),
@@ -944,6 +976,7 @@ _ADVANCED_SETTINGS_CHOICES: dict[str, tuple[str, ...]] = {
     "backup_hint": ("strong", "normal", "weak", "auto"),
     "log_level": ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"),
     "environment": ("development", "production"),
+    "web_search_provider": ("duckduckgo", "kagi", "google", "bing"),
 }
 
 

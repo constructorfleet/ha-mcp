@@ -629,6 +629,19 @@ def test_advanced_override_rejects_invalid_choice(
     assert get_global_settings().log_level == "INFO"
 
 
+def test_advanced_override_rejects_invalid_web_search_provider(
+    isolated_data_dir, monkeypatch
+) -> None:
+    _clear_all_feature_envs(monkeypatch)
+    (isolated_data_dir / "feature_flags.json").write_text(
+        json.dumps({"web_search_provider": "askjeeves"})
+    )
+    from ha_mcp.config import _reset_global_settings, get_global_settings
+
+    _reset_global_settings()
+    assert get_global_settings().web_search_provider == "duckduckgo"
+
+
 def test_advanced_override_str_field_with_null_byte_rejected(
     isolated_data_dir, monkeypatch
 ) -> None:

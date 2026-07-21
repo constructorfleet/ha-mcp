@@ -8,6 +8,7 @@ import pytest
 
 from ha_mcp import __version__
 from ha_mcp.tools.tools_bug_report import (
+    _build_duplicate_check_urls,
     _detect_mcp_transport,
     _extract_client_info,
     _fetch_addon_logs,
@@ -647,16 +648,48 @@ class TestBugReportTool:
             urls = result["duplicate_check_urls"]
             assert isinstance(urls, list)
             assert len(urls) > 0
-            # All URLs should be GitHub issue search URLs
+            # Default provider is DuckDuckGo, scoped to the project's issues.
             for url in urls:
-                assert "github.com/homeassistant-ai/ha-mcp/issues" in url
-                assert "is%3Aissue" in url
+                assert url.startswith("https://duckduckgo.com/?q=")
+                assert "site%3Agithub.com%2Fhomeassistant-ai%2Fha-mcp%2Fissues" in url
 
             # Verify keywords are in URLs
             url_content = "".join(urls)
             assert "ha_call_service" in url_content
             assert "connection" in url_content
             assert "timeout" in url_content
+
+    def test_duplicate_check_urls_empty_when_external_search_disabled(self):
+        fake_settings = SimpleNamespace(
+            web_search_provider="duckduckgo",
+            web_search_allow_external=False,
+            web_search_include_error_keywords=True,
+            web_search_safe_search=True,
+        )
+        diag = {"connection_status": "Connected"}
+        logs = [{"tool_name": "ha_call_service", "error_message": "Connection timeout"}]
+        with patch(
+            "ha_mcp.tools.tools_bug_report.get_global_settings", return_value=fake_settings
+        ):
+            assert _build_duplicate_check_urls(diag, logs) == []
+
+    def test_duplicate_check_urls_privacy_mode_uses_generic_query(self):
+        fake_settings = SimpleNamespace(
+            web_search_provider="google",
+            web_search_allow_external=True,
+            web_search_include_error_keywords=False,
+            web_search_safe_search=True,
+        )
+        diag = {"connection_status": "Connected"}
+        logs = [{"tool_name": "ha_call_service", "error_message": "Connection timeout"}]
+        with patch(
+            "ha_mcp.tools.tools_bug_report.get_global_settings", return_value=fake_settings
+        ):
+            urls = _build_duplicate_check_urls(diag, logs)
+        assert len(urls) == 1
+        assert urls[0].startswith("https://www.google.com/search?q=")
+        assert "ha-mcp+issue" in urls[0]
+        assert "connection" not in urls[0]
 
     @pytest.mark.asyncio
     async def test_bug_report_updated_instructions(

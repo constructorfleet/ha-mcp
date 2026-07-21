@@ -220,6 +220,10 @@ _CONFIG_TOGGLE_FIELDS: tuple[str, ...] = (
     "enable_dashboard_partial_tools",
     "enable_tool_search",
     "tool_search_max_results",
+    "web_search_provider",
+    "web_search_allow_external",
+    "web_search_include_error_keywords",
+    "web_search_safe_search",
     "enable_yaml_config_editing",
     "enable_filesystem_tools",
     "enable_code_mode",
@@ -836,12 +840,8 @@ class BugReportTools:
         # Anonymization instructions
         anonymization_guide = _generate_anonymization_guide()
 
-        # Generate search keywords and URLs for duplicate check
-        search_keywords = _generate_search_keywords(diagnostic_info, recent_logs)
-        duplicate_check_urls = [
-            f"https://github.com/homeassistant-ai/ha-mcp/issues?q=is%3Aissue+{quote_plus(keyword)}"
-            for keyword in search_keywords[:3]  # Limit to top 3 keywords
-        ]
+        # Generate duplicate-check URLs using provider/privacy settings.
+        duplicate_check_urls = _build_duplicate_check_urls(diagnostic_info, recent_logs)
 
         return {
             "success": True,
@@ -1100,6 +1100,54 @@ def _generate_search_keywords(
         keywords.add("bug")
 
     return list(keywords)
+
+
+def _web_search_urls_for_provider(
+    provider: str, query: str, *, safe_search: bool
+) -> list[str]:
+    """Build duplicate-check URLs for one search provider and query."""
+    encoded = quote_plus(query)
+    if provider == "duckduckgo":
+        kp = "1" if safe_search else "-1"
+        return [f"https://duckduckgo.com/?q={encoded}&kp={kp}"]
+    if provider == "kagi":
+        safe = "active" if safe_search else "off"
+        return [f"https://kagi.com/search?q={encoded}&safe={safe}"]
+    if provider == "google":
+        safe = "active" if safe_search else "off"
+        return [f"https://www.google.com/search?q={encoded}&safe={safe}"]
+    if provider == "bing":
+        adlt = "strict" if safe_search else "off"
+        return [f"https://www.bing.com/search?q={encoded}&adlt={adlt}"]
+    return [
+        (
+            "https://github.com/homeassistant-ai/ha-mcp/issues"
+            f"?q=is%3Aissue+{quote_plus(query)}"
+        )
+    ]
+
+
+def _build_duplicate_check_urls(
+    diagnostic_info: dict[str, Any], recent_logs: list[dict[str, Any]]
+) -> list[str]:
+    """Build duplicate-check URLs using configured provider/privacy settings."""
+    settings = get_global_settings()
+    if not settings.web_search_allow_external:
+        return []
+    if settings.web_search_include_error_keywords:
+        keywords = _generate_search_keywords(diagnostic_info, recent_logs)[:3]
+    else:
+        keywords = ["ha-mcp issue"]
+    provider = settings.web_search_provider
+    safe_search = settings.web_search_safe_search
+    base_scope = "site:github.com/homeassistant-ai/ha-mcp/issues"
+    urls: list[str] = []
+    for keyword in keywords:
+        query = f"{base_scope} {keyword}".strip()
+        urls.extend(
+            _web_search_urls_for_provider(provider, query, safe_search=safe_search)
+        )
+    return urls
 
 
 def _generate_runtime_bug_template(
