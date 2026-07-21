@@ -308,7 +308,7 @@ Requires add-on restart to take effect.
 
 Registers the opt-in `ha_web_search` tool, which queries a public search engine
 (Kagi or Google Programmable Search) on the agent's behalf. Off by default: it
-is the only tool that sends query text to a third party.
+sends your query text to a third-party search provider.
 
 Credentials and privacy controls are configured in the **Web Search** section of
 the web settings UI, not here — the API key is encrypted at rest rather than

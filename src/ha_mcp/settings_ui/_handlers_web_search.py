@@ -78,7 +78,14 @@ def _parse_settings(payload: dict[str, Any]) -> SearchSettings | None:
         or blocklist is None
     ):
         return None
-    return SearchSettings(enabled, provider, safe, maximum, allowlist, blocklist)
+    return SearchSettings(
+        enabled=enabled,
+        default_provider=provider,
+        safe_search=safe,
+        max_results=maximum,
+        domain_allowlist=allowlist,
+        domain_blocklist=blocklist,
+    )
 
 
 def _field(entry: dict[str, Any], name: str) -> str:

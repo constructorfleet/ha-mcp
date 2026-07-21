@@ -439,6 +439,8 @@
     "web_search.credentials.kagi_key.label": "Kagi API-Schlüssel",
     "web_search.credentials.google_key.label": "Google API-Schlüssel",
     "web_search.credentials.engine_id.label": "Google Programmable Search Engine-ID",
+    "web_search.credentials.configured": "Konfiguriert (verschlüsselt gespeichert)",
+    "web_search.credentials.not_configured": "Nicht konfiguriert",
     "web_search.save": "Websuche-Einstellungen speichern",
     "actions.clear": "Löschen"
   },

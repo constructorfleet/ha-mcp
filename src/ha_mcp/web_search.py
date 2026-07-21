@@ -310,13 +310,15 @@ def _kagi_error_detail(response: httpx.Response) -> str:
 async def search_web(
     query: str, provider: ProviderName | None, limit: int | None
 ) -> dict[str, Any]:
-    settings = load_search_settings()
     from .config import get_global_settings
 
+    # Feature flag first: a corrupt settings file must not mask the actionable
+    # "disabled" error, and a disabled tool should do no disk IO at all.
     if not get_global_settings().enable_web_search:
         raise WebSearchConfigurationError(
             "Web search is disabled. Enable it in Settings first."
         )
+    settings = load_search_settings()
     chosen = provider or settings.default_provider
     if chosen not in _PROVIDERS:
         raise WebSearchConfigurationError("Unsupported web-search provider.")

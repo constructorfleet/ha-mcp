@@ -439,6 +439,8 @@
     "web_search.credentials.kagi_key.label": "API-ключ Kagi",
     "web_search.credentials.google_key.label": "API-ключ Google",
     "web_search.credentials.engine_id.label": "Идентификатор поискового движка Google Programmable Search",
+    "web_search.credentials.configured": "Настроено (зашифровано на диске)",
+    "web_search.credentials.not_configured": "Не настроено",
     "web_search.save": "Сохранить настройки веб-поиска",
     "actions.clear": "Очистить"
   },

@@ -424,6 +424,21 @@ async def test_search_rejects_disabled_without_calling_provider() -> None:
 
 
 @pytest.mark.asyncio
+async def test_disabled_flag_reported_before_reading_corrupt_settings(
+    tmp_path,
+) -> None:
+    (tmp_path / "web_search.json").write_text("not json {{{")
+    from ha_mcp.config import get_global_settings
+
+    get_global_settings().enable_web_search = False
+
+    # A corrupt settings file must not mask the actionable "disabled" error:
+    # the flag is checked before any config is read from disk.
+    with pytest.raises(web_search.WebSearchConfigurationError, match="disabled"):
+        await web_search.search_web("lights", None, None)
+
+
+@pytest.mark.asyncio
 async def test_zero_limit_is_rejected_not_silently_replaced() -> None:
     # limit=0 must be treated as an invalid value (not silently replaced with
     # max_results by ``limit or max_results``, which treats 0 as falsy).

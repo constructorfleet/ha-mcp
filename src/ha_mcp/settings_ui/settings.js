@@ -3821,8 +3821,10 @@ async function loadWebSearchSettings(forcedEnabled = undefined) {
     document.getElementById('web-search-max').value = data.max_results;
     document.getElementById('web-search-allow').value = (data.domain_allowlist || []).join(', ');
     document.getElementById('web-search-block').value = (data.domain_blocklist || []).join(', ');
-    document.getElementById('web-search-kagi-status').textContent = data.credentials.kagi ? 'Configured (encrypted at rest)' : 'Not configured';
-    document.getElementById('web-search-google-status').textContent = data.credentials.google ? 'Configured (encrypted at rest)' : 'Not configured';
+    const configured = t('web_search.credentials.configured', {}, 'Configured (encrypted at rest)');
+    const notConfigured = t('web_search.credentials.not_configured', {}, 'Not configured');
+    document.getElementById('web-search-kagi-status').textContent = data.credentials.kagi ? configured : notConfigured;
+    document.getElementById('web-search-google-status').textContent = data.credentials.google ? configured : notConfigured;
     webSearchBaseline = webSearchSettingsSnapshot();
     updateWebSearchDirty();
     // A prior failure may have left the span as role=alert with stale error
