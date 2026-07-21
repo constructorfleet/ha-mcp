@@ -3808,13 +3808,14 @@ function webSearchFailure(status, message) {
   showToast(message, {isError: true});
 }
 
-async function loadWebSearchSettings() {
+async function loadWebSearchSettings(forcedEnabled = undefined) {
   const status = document.getElementById('web-search-status');
   try {
     const response = await fetch('./api/settings/web-search');
     if (!response.ok) throw new Error(await webSearchErrorDetail(response));
     const data = await response.json();
-    document.getElementById('web-search-enabled').checked = !!data.enabled;
+    const enabled = forcedEnabled !== undefined ? forcedEnabled : data.enabled;
+    document.getElementById('web-search-enabled').checked = !!enabled;
     document.getElementById('web-search-provider').value = data.default_provider;
     document.getElementById('web-search-safe').value = data.safe_search;
     document.getElementById('web-search-max').value = data.max_results;
@@ -3873,7 +3874,7 @@ async function saveWebSearchSettings() {
     // written afterwards or it gets wiped. If the reload itself failed it has
     // already put its own error in the span — don't paper over it, but still
     // toast the save, which did succeed.
-    const reloaded = await loadWebSearchSettings();
+    const reloaded = await loadWebSearchSettings(payload.enabled);
     if (reloaded) status.textContent = 'Saved. Restart required.';
     showToast('Saved. Restart required.');
   } catch (error) {
