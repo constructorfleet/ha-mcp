@@ -3764,6 +3764,28 @@ function webSearchList(id) {
 
 let webSearchClearKagi = false;
 let webSearchClearGoogle = false;
+let webSearchBaseline = null;
+
+function webSearchSettingsSnapshot() {
+  return JSON.stringify({
+    enabled: document.getElementById('web-search-enabled').checked,
+    provider: document.getElementById('web-search-provider').value,
+    safe: document.getElementById('web-search-safe').value,
+    max: document.getElementById('web-search-max').value,
+    allow: document.getElementById('web-search-allow').value,
+    block: document.getElementById('web-search-block').value,
+  });
+}
+
+function updateWebSearchDirty() {
+  const dirty = webSearchSettingsSnapshot() !== webSearchBaseline
+    || document.getElementById('web-search-kagi-key').value !== ''
+    || document.getElementById('web-search-google-key').value !== ''
+    || document.getElementById('web-search-google-engine').value !== ''
+    || webSearchClearKagi
+    || webSearchClearGoogle;
+  document.getElementById('web-search-save').style.display = dirty ? '' : 'none';
+}
 
 async function loadWebSearchSettings() {
   const status = document.getElementById('web-search-status');
@@ -3779,6 +3801,8 @@ async function loadWebSearchSettings() {
     document.getElementById('web-search-block').value = (data.domain_blocklist || []).join(', ');
     document.getElementById('web-search-kagi-status').textContent = data.credentials.kagi ? 'Configured (encrypted at rest)' : 'Not configured';
     document.getElementById('web-search-google-status').textContent = data.credentials.google ? 'Configured (encrypted at rest)' : 'Not configured';
+    webSearchBaseline = webSearchSettingsSnapshot();
+    updateWebSearchDirty();
   } catch (error) {
     status.textContent = 'Could not load web-search settings: ' + error.message;
   }
@@ -3825,8 +3849,14 @@ async function saveWebSearchSettings() {
 }
 
 document.getElementById('web-search-save').addEventListener('click', saveWebSearchSettings);
-document.getElementById('web-search-clear-kagi').addEventListener('click', () => { webSearchClearKagi = true; document.getElementById('web-search-kagi-key').value = ''; });
-document.getElementById('web-search-clear-google').addEventListener('click', () => { webSearchClearGoogle = true; document.getElementById('web-search-google-key').value = ''; document.getElementById('web-search-google-engine').value = ''; });
+document.getElementById('web-search-clear-kagi').addEventListener('click', () => { webSearchClearKagi = true; document.getElementById('web-search-kagi-key').value = ''; updateWebSearchDirty(); });
+document.getElementById('web-search-clear-google').addEventListener('click', () => { webSearchClearGoogle = true; document.getElementById('web-search-google-key').value = ''; document.getElementById('web-search-google-engine').value = ''; updateWebSearchDirty(); });
+['web-search-enabled', 'web-search-provider', 'web-search-safe'].forEach((id) => {
+  document.getElementById(id).addEventListener('change', updateWebSearchDirty);
+});
+['web-search-max', 'web-search-allow', 'web-search-block', 'web-search-kagi-key', 'web-search-google-key', 'web-search-google-engine'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', updateWebSearchDirty);
+});
 loadWebSearchSettings();
 loadTools();
 loadFsCustomPaths();

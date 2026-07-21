@@ -250,10 +250,10 @@
     <div class="adv-row"><div class="adv-info"><div class="adv-name">Allowed result domains</div><div class="adv-help">Comma-separated. Empty permits all domains unless blocked.</div></div><div class="adv-control"><input id="web-search-allow" type="text"></div></div>
     <div class="adv-row"><div class="adv-info"><div class="adv-name">Blocked result domains</div><div class="adv-help">Comma-separated. Always takes precedence.</div></div><div class="adv-control"><input id="web-search-block" type="text"></div></div>
     <h3>Credentials</h3>
-    <div class="adv-row"><div class="adv-info"><div class="adv-name">Kagi API key</div><div class="adv-help" id="web-search-kagi-status"></div></div><div class="adv-control"><input id="web-search-kagi-key" type="password" autocomplete="new-password"><button type="button" id="web-search-clear-kagi">Clear</button></div></div>
-    <div class="adv-row"><div class="adv-info"><div class="adv-name">Google API key</div><div class="adv-help" id="web-search-google-status"></div></div><div class="adv-control"><input id="web-search-google-key" type="password" autocomplete="new-password"><button type="button" id="web-search-clear-google">Clear</button></div></div>
+    <div class="adv-row"><div class="adv-info"><div class="adv-name">Kagi API key</div><div class="adv-help" id="web-search-kagi-status"></div></div><div class="adv-control"><input id="web-search-kagi-key" type="password" autocomplete="new-password"><button type="button" id="web-search-clear-kagi" class="a11y-reset">Clear</button></div></div>
+    <div class="adv-row"><div class="adv-info"><div class="adv-name">Google API key</div><div class="adv-help" id="web-search-google-status"></div></div><div class="adv-control"><input id="web-search-google-key" type="password" autocomplete="new-password"><button type="button" id="web-search-clear-google" class="a11y-reset">Clear</button></div></div>
     <div class="adv-row"><div class="adv-info"><div class="adv-name">Google Programmable Search Engine ID</div></div><div class="adv-control"><input id="web-search-google-engine" type="text"></div></div>
-    <button id="web-search-save">Save web-search settings</button><span id="web-search-status" class="status" role="status"></span>
+    <button id="web-search-save" type="button" class="restart-btn" style="display:none">Save web-search settings</button><span id="web-search-status" class="status" role="status"></span>
   </section>
 
   <!-- Advanced settings sections. The "Connection
