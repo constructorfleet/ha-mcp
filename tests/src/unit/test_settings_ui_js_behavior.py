@@ -5542,3 +5542,48 @@ class TestEmbeddedRestartButton:
         assert m and "Restart HA-MCP Server" in m.group(1), (
             f"embedded restart-notice copy missing; got {m.group(1) if m else None}"
         )
+
+
+class TestWebSearchSaveOrdering:
+    """The Web Search Save flow must persist provider settings BEFORE flipping
+    the ``enable_web_search`` feature flag.
+
+    The two writes go to different endpoints with no transaction: if the flag
+    is flipped first and the settings POST is then rejected (e.g. enabling
+    Google with a blank engine id), the feature ends up enabled with no valid
+    provider configured while the UI reports "Save failed". Settings-first
+    ordering keeps a rejected save from ever touching the flag.
+    """
+
+    def test_rejected_settings_save_does_not_flip_feature_flag(
+        self, settings_script: str
+    ) -> None:
+        fetches = {
+            **DEFAULT_FETCHES,
+            # Every call to the web-search route is rejected — the init GET
+            # fails gracefully (caught) and, crucially, the save POST returns
+            # 400 so we can assert the feature flag POST never fires.
+            "/api/settings/web-search": {
+                "status": 400,
+                "json": {"error": {"message": "Google search-engine ID is required."}},
+            },
+        }
+        result = run_script(
+            settings_script,
+            initial_html=MIN_DOM,
+            fetch_map=fetches,
+            invoke="""
+              document.getElementById('web-search-enabled').checked = true;
+              await window.saveWebSearchSettings();
+            """,
+        )
+        _assert_clean_init(result)
+
+        posts = [f for f in result.fetches if f["method"] == "POST"]
+        ws_posts = [f for f in posts if "/api/settings/web-search" in f["url"]]
+        feature_posts = [f for f in posts if "/api/settings/features" in f["url"]]
+        assert ws_posts, "save must POST the web-search settings"
+        assert feature_posts == [], (
+            "enable_web_search feature flag must not be flipped when the "
+            f"settings save is rejected; got {feature_posts}"
+        )

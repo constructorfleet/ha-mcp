@@ -3804,10 +3804,14 @@ async function saveWebSearchSettings() {
   if (webSearchClearGoogle) credentials.google = {clear: true};
   if (Object.keys(credentials).length) payload.credentials = credentials;
   try {
-    const featureResponse = await fetch('./api/settings/features', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({flags: {enable_web_search: payload.enabled}})});
-    if (!featureResponse.ok) throw new Error('could not update web-search enablement (HTTP ' + featureResponse.status + ')');
+    // Persist (and validate) provider settings BEFORE flipping the feature
+    // flag: the two writes hit different endpoints with no transaction, so if
+    // the flag were flipped first a rejected settings save would leave web
+    // search enabled with no valid provider configured.
     const response = await fetch('./api/settings/web-search', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
     if (!response.ok) throw new Error('HTTP ' + response.status);
+    const featureResponse = await fetch('./api/settings/features', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({flags: {enable_web_search: payload.enabled}})});
+    if (!featureResponse.ok) throw new Error('could not update web-search enablement (HTTP ' + featureResponse.status + ')');
     status.textContent = 'Saved. Restart required.';
     markRestartRequired();
     document.getElementById('web-search-kagi-key').value = '';
