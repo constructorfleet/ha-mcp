@@ -5609,6 +5609,72 @@ class TestWebSearchSaveOrdering:
         )
 
 
+class TestWebSearchClearFlagReset:
+    """Typing a new credential after clicking Clear must cancel the clear.
+
+    The clear buttons latch a module-level flag that the save payload builder
+    checks last, so a stale flag overwrote the freshly typed key with
+    ``{clear: true}`` — the new credential was silently discarded.
+    """
+
+    def _saved_credentials(self, settings_script: str, invoke: str) -> dict:
+        result = run_script(
+            settings_script,
+            initial_html=MIN_DOM,
+            fetch_map=DEFAULT_FETCHES,
+            invoke=invoke,
+        )
+        _assert_clean_init(result)
+        posts = [
+            f
+            for f in result.fetches
+            if f["method"] == "POST" and "/api/settings/web-search" in f["url"]
+        ]
+        assert posts, "save must POST the web-search settings"
+        return json.loads(posts[-1]["body"]).get("credentials", {})
+
+    def test_typing_a_key_after_clear_keeps_the_new_key(
+        self, settings_script: str
+    ) -> None:
+        credentials = self._saved_credentials(
+            settings_script,
+            """
+              document.getElementById('web-search-clear-kagi').click();
+              const key = document.getElementById('web-search-kagi-key');
+              key.value = 'freshly-typed';
+              key.dispatchEvent(new Event('input'));
+              await window.saveWebSearchSettings();
+            """,
+        )
+        assert credentials.get("kagi") == {"api_key": "freshly-typed"}
+
+    def test_typing_an_engine_id_after_clear_keeps_the_new_value(
+        self, settings_script: str
+    ) -> None:
+        credentials = self._saved_credentials(
+            settings_script,
+            """
+              document.getElementById('web-search-clear-google').click();
+              const engine = document.getElementById('web-search-google-engine');
+              engine.value = 'new-engine';
+              engine.dispatchEvent(new Event('input'));
+              await window.saveWebSearchSettings();
+            """,
+        )
+        assert credentials.get("google", {}).get("engine_id") == "new-engine"
+        assert "clear" not in credentials.get("google", {})
+
+    def test_clear_alone_still_sends_the_clear_flag(self, settings_script: str) -> None:
+        credentials = self._saved_credentials(
+            settings_script,
+            """
+              document.getElementById('web-search-clear-kagi').click();
+              await window.saveWebSearchSettings();
+            """,
+        )
+        assert credentials.get("kagi") == {"clear": True}
+
+
 class TestWebSearchErrorReporting:
     """Web-search load/save failures must surface the server's structured
     error message and announce it as an alert.

@@ -3890,8 +3890,21 @@ document.getElementById('web-search-clear-google').addEventListener('click', () 
 ['web-search-enabled', 'web-search-provider', 'web-search-safe'].forEach((id) => {
   document.getElementById(id).addEventListener('change', updateWebSearchDirty);
 });
-['web-search-max', 'web-search-allow', 'web-search-block', 'web-search-kagi-key', 'web-search-google-key', 'web-search-google-engine'].forEach((id) => {
+// Typing a new secret after clicking Clear cancels the pending clear —
+// otherwise the save still sends {clear: true} and silently discards the
+// credential the user just entered.
+function webSearchCredentialInput(id) {
+  if (document.getElementById(id).value !== '') {
+    if (id === 'web-search-kagi-key') webSearchClearKagi = false;
+    if (id === 'web-search-google-key' || id === 'web-search-google-engine') webSearchClearGoogle = false;
+  }
+  updateWebSearchDirty();
+}
+['web-search-max', 'web-search-allow', 'web-search-block'].forEach((id) => {
   document.getElementById(id).addEventListener('input', updateWebSearchDirty);
+});
+['web-search-kagi-key', 'web-search-google-key', 'web-search-google-engine'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => webSearchCredentialInput(id));
 });
 loadWebSearchSettings();
 loadTools();
