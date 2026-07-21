@@ -133,7 +133,7 @@ async def test_save_rejects_legacy_safe_search_value(monkeypatch) -> None:
     monkeypatch.setattr(
         handler_module,
         "get_global_settings",
-        lambda: type("Settings", (), {"enable_web_search": False})(),
+        type("Settings", (), {"enable_web_search": False}),
     )
     handlers = build_web_search_handlers()
 
@@ -333,6 +333,22 @@ def test_normalize_google_result_tolerates_null_pagemap() -> None:
     assert "published_date" not in result
 
 
+def test_normalize_google_result_tolerates_dict_metatags() -> None:
+    # The Google API has returned pagemap.metatags as a dict instead of a list
+    # in some response schemas; indexing a dict with [0] raises KeyError.
+    item = {
+        "title": "T",
+        "link": "https://example.com/a",
+        "snippet": "s",
+        "pagemap": {"metatags": {"article:published_time": "2024-01-01"}},
+    }
+
+    result = web_search._normalize_result(item, "google")
+
+    assert result["url"] == "https://example.com/a"
+    assert "published_date" not in result
+
+
 @pytest.mark.asyncio
 async def test_provider_network_error_is_wrapped_as_provider_error(monkeypatch) -> None:
     from ha_mcp.config import get_global_settings
@@ -396,6 +412,20 @@ async def test_search_rejects_disabled_without_calling_provider() -> None:
         await web_search.search_web("lights", None, None)
 
 
+@pytest.mark.asyncio
+async def test_zero_limit_is_rejected_not_silently_replaced() -> None:
+    # limit=0 must be treated as an invalid value (not silently replaced with
+    # max_results by ``limit or max_results``, which treats 0 as falsy).
+    from ha_mcp.config import get_global_settings
+
+    get_global_settings().enable_web_search = True
+    web_search.save_search_settings(web_search.SearchSettings(enabled=True))
+    web_search.save_credentials({"kagi": {"api_key": "secret"}})
+
+    with pytest.raises(web_search.WebSearchConfigurationError, match="at least 1"):
+        await web_search.search_web("lights", "kagi", 0)
+
+
 def test_corrupt_encrypted_credentials_are_rejected(tmp_path) -> None:
     (tmp_path / "web_search_credentials.enc").write_text("not encrypted")
     (tmp_path / ".web_search_credentials.key").write_bytes(
@@ -430,7 +460,7 @@ async def test_settings_endpoint_masks_credentials_and_can_clear(monkeypatch) ->
     monkeypatch.setattr(
         handler_module,
         "get_global_settings",
-        lambda: type("Settings", (), {"enable_web_search": False})(),
+        type("Settings", (), {"enable_web_search": False}),
     )
     web_search.save_credentials({"kagi": {"api_key": "secret"}})
     handlers = build_web_search_handlers()
@@ -464,7 +494,7 @@ async def test_save_persists_submitted_enabled_flag(monkeypatch) -> None:
     monkeypatch.setattr(
         handler_module,
         "get_global_settings",
-        lambda: type("Settings", (), {"enable_web_search": False})(),
+        type("Settings", (), {"enable_web_search": False}),
     )
     handlers = build_web_search_handlers()
 
@@ -495,7 +525,7 @@ async def test_save_returns_structured_error_when_credentials_corrupt(
     monkeypatch.setattr(
         handler_module,
         "get_global_settings",
-        lambda: type("Settings", (), {"enable_web_search": False})(),
+        type("Settings", (), {"enable_web_search": False}),
     )
     # A corrupt credentials store makes load_credentials() raise; the save
     # handler must surface a structured 409 like the GET handler does, not a 500.

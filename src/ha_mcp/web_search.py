@@ -62,13 +62,26 @@ def _create_key(path: Path) -> bytes:
     Uses ``O_EXCL`` so only the first writer persists a key; a racing writer
     that loses reads the winner's key instead of overwriting it — overwriting
     would silently orphan any credentials already encrypted under the first key.
+    The loser polls until the winning writer has flushed the full 44-byte key,
+    preventing a transient read of an empty or partially-written file.
     """
+    import time
+
     path.parent.mkdir(parents=True, exist_ok=True)
     candidate = Fernet.generate_key()
     try:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError:
-        return path.read_bytes()
+        # The winning writer may still be flushing; retry until the full key
+        # (44 bytes) is present so _fernet() never sees a truncated read.
+        deadline = time.monotonic() + 1.0
+        while True:
+            raw = path.read_bytes()
+            if len(raw) == 44:
+                return raw
+            if time.monotonic() >= deadline:
+                return raw  # Let _fernet() validate and raise if still short.
+            time.sleep(0.05)
     with os.fdopen(fd, "wb") as handle:
         handle.write(candidate)
     return candidate
@@ -248,7 +261,7 @@ def _normalize_result(item: dict[str, Any], provider: ProviderName) -> dict[str,
     # ``.get("pagemap", {})`` alone can yield None — normalize before indexing.
     pagemap = item.get("pagemap")
     metatags = pagemap.get("metatags") if isinstance(pagemap, dict) else None
-    if metatags:
+    if isinstance(metatags, list) and metatags:
         date = metatags[0].get("article:published_time")
         if date:
             result["published_date"] = str(date)
@@ -299,7 +312,9 @@ async def search_web(
     chosen = provider or settings.default_provider
     if chosen not in _PROVIDERS:
         raise WebSearchConfigurationError("Unsupported web-search provider.")
-    result_limit = min(limit or settings.max_results, settings.max_results)
+    result_limit = min(
+        limit if limit is not None else settings.max_results, settings.max_results
+    )
     if result_limit < 1:
         raise WebSearchConfigurationError("result_limit must be at least 1.")
     credentials = load_credentials().get(chosen, {})

@@ -3866,6 +3866,7 @@ async function saveWebSearchSettings() {
     markRestartRequired();
     document.getElementById('web-search-kagi-key').value = '';
     document.getElementById('web-search-google-key').value = '';
+    document.getElementById('web-search-google-engine').value = '';
     webSearchClearKagi = false;
     webSearchClearGoogle = false;
     // Reload first: it clears the status span, so the confirmation has to be
