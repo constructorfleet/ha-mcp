@@ -27,6 +27,7 @@ def _reset_settings_singleton():
     yield
     _reset_global_settings()
 
+
 def test_credentials_are_encrypted_and_never_returned(tmp_path) -> None:
     web_search.save_credentials({"kagi": {"api_key": "very-secret"}})
 
