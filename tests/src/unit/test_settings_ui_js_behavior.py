@@ -97,6 +97,21 @@ _TOP_LEVEL_ELEMENT_IDS = [
     # Developer section (issue #1775) — bottom of panel-server; hosts the
     # dev-mode toggle whose enable path is confirm()-gated.
     "advDeveloper",
+    "web-search-enabled",
+    "web-search-provider",
+    "web-search-safe",
+    "web-search-max",
+    "web-search-allow",
+    "web-search-block",
+    "web-search-kagi-status",
+    "web-search-google-status",
+    "web-search-kagi-key",
+    "web-search-google-key",
+    "web-search-google-engine",
+    "web-search-status",
+    "web-search-save",
+    "web-search-clear-kagi",
+    "web-search-clear-google",
     # Beta features dedicated container — beta
     # master + sub-flags render here, NOT into featuresBody, so the
     # dangerous block sits at the bottom of panel-server.
@@ -135,6 +150,15 @@ def _min_dom_row(el_id: str) -> str | None:
     return _min_dom_row_tail(el_id)
 
 
+# Each select carries only its own valid options, so a swapped or misdirected
+# assignment (the safe-search value written into the provider select) leaves the
+# value empty and fails the assertion instead of quietly passing.
+_SELECT_OPTIONS = {
+    "web-search-provider": ("kagi", "google"),
+    "web-search-safe": ("on", "off"),
+}
+
+
 def _min_dom_row_tail(el_id: str) -> str | None:
     """DOM stub markup for ``el_id`` (second half of the dispatch); None emits nothing."""
     if el_id in (
@@ -143,6 +167,9 @@ def _min_dom_row_tail(el_id: str) -> str | None:
         "backupConfigSave",
         "backupRefresh",
         "backupBulkDelete",
+        "web-search-save",
+        "web-search-clear-kagi",
+        "web-search-clear-google",
     ):
         return f'<button id="{el_id}"></button>'
     if el_id == "restartNotice":
@@ -151,6 +178,23 @@ def _min_dom_row_tail(el_id: str) -> str | None:
         return None  # rendered as a child of restartNotice above
     if el_id == "search":
         return '<input id="search" />'
+    if el_id == "web-search-enabled":
+        return f'<input id="{el_id}" type="checkbox" />'
+    if el_id in _SELECT_OPTIONS:
+        options = "".join(
+            f'<option value="{value}">{value}</option>'
+            for value in _SELECT_OPTIONS[el_id]
+        )
+        return f'<select id="{el_id}">{options}</select>'
+    if el_id in (
+        "web-search-max",
+        "web-search-allow",
+        "web-search-block",
+        "web-search-kagi-key",
+        "web-search-google-key",
+        "web-search-google-engine",
+    ):
+        return f'<input id="{el_id}" />'
     if el_id in ("policy-master-toggle", "read-only-mode-toggle"):
         return f'<input id="{el_id}" type="checkbox" />'
     if el_id == "policy-save-global-btn":
@@ -225,6 +269,18 @@ DEFAULT_FETCHES: dict[str, dict] = {
     "/api/settings/backup-config": {
         "status": 200,
         "json": {},
+    },
+    "/api/settings/web-search": {
+        "status": 200,
+        "json": {
+            "enabled": False,
+            "default_provider": "kagi",
+            "safe_search": "on",
+            "max_results": 5,
+            "domain_allowlist": [],
+            "domain_blocklist": [],
+            "credentials": {"kagi": False, "google": False},
+        },
     },
 }
 
@@ -5506,3 +5562,178 @@ class TestEmbeddedRestartButton:
         assert m and "Restart HA-MCP Server" in m.group(1), (
             f"embedded restart-notice copy missing; got {m.group(1) if m else None}"
         )
+
+
+class TestWebSearchSaveOrdering:
+    """The Web Search Save flow must persist provider settings BEFORE flipping
+    the ``enable_web_search`` feature flag.
+
+    The two writes go to different endpoints with no transaction: if the flag
+    is flipped first and the settings POST is then rejected (e.g. enabling
+    Google with a blank engine id), the feature ends up enabled with no valid
+    provider configured while the UI reports "Save failed". Settings-first
+    ordering keeps a rejected save from ever touching the flag.
+    """
+
+    def test_rejected_settings_save_does_not_flip_feature_flag(
+        self, settings_script: str
+    ) -> None:
+        fetches = {
+            **DEFAULT_FETCHES,
+            # Every call to the web-search route is rejected — the init GET
+            # fails gracefully (caught) and, crucially, the save POST returns
+            # 400 so we can assert the feature flag POST never fires.
+            "/api/settings/web-search": {
+                "status": 400,
+                "json": {"error": {"message": "Google search-engine ID is required."}},
+            },
+        }
+        result = run_script(
+            settings_script,
+            initial_html=MIN_DOM,
+            fetch_map=fetches,
+            invoke="""
+              document.getElementById('web-search-enabled').checked = true;
+              await window.saveWebSearchSettings();
+            """,
+        )
+        _assert_clean_init(result)
+
+        posts = [f for f in result.fetches if f["method"] == "POST"]
+        ws_posts = [f for f in posts if "/api/settings/web-search" in f["url"]]
+        feature_posts = [f for f in posts if "/api/settings/features" in f["url"]]
+        assert ws_posts, "save must POST the web-search settings"
+        assert feature_posts == [], (
+            "enable_web_search feature flag must not be flipped when the "
+            f"settings save is rejected; got {feature_posts}"
+        )
+
+
+class TestWebSearchClearFlagReset:
+    """Typing a new credential after clicking Clear must cancel the clear.
+
+    The clear buttons latch a module-level flag that the save payload builder
+    checks last, so a stale flag overwrote the freshly typed key with
+    ``{clear: true}`` — the new credential was silently discarded.
+    """
+
+    def _saved_credentials(self, settings_script: str, invoke: str) -> dict:
+        result = run_script(
+            settings_script,
+            initial_html=MIN_DOM,
+            fetch_map=DEFAULT_FETCHES,
+            invoke=invoke,
+        )
+        _assert_clean_init(result)
+        posts = [
+            f
+            for f in result.fetches
+            if f["method"] == "POST" and "/api/settings/web-search" in f["url"]
+        ]
+        assert posts, "save must POST the web-search settings"
+        return json.loads(posts[-1]["body"]).get("credentials", {})
+
+    def test_typing_a_key_after_clear_keeps_the_new_key(
+        self, settings_script: str
+    ) -> None:
+        credentials = self._saved_credentials(
+            settings_script,
+            """
+              document.getElementById('web-search-clear-kagi').click();
+              const key = document.getElementById('web-search-kagi-key');
+              key.value = 'freshly-typed';
+              key.dispatchEvent(new Event('input'));
+              await window.saveWebSearchSettings();
+            """,
+        )
+        assert credentials.get("kagi") == {"api_key": "freshly-typed"}
+
+    def test_typing_an_engine_id_after_clear_keeps_the_new_value(
+        self, settings_script: str
+    ) -> None:
+        credentials = self._saved_credentials(
+            settings_script,
+            """
+              document.getElementById('web-search-clear-google').click();
+              const engine = document.getElementById('web-search-google-engine');
+              engine.value = 'new-engine';
+              engine.dispatchEvent(new Event('input'));
+              await window.saveWebSearchSettings();
+            """,
+        )
+        assert credentials.get("google", {}).get("engine_id") == "new-engine"
+        assert "clear" not in credentials.get("google", {})
+
+    def test_clear_alone_still_sends_the_clear_flag(self, settings_script: str) -> None:
+        credentials = self._saved_credentials(
+            settings_script,
+            """
+              document.getElementById('web-search-clear-kagi').click();
+              await window.saveWebSearchSettings();
+            """,
+        )
+        assert credentials.get("kagi") == {"clear": True}
+
+
+class TestWebSearchErrorReporting:
+    """Web-search load/save failures must surface the server's structured
+    error message and announce it as an alert.
+
+    The span started as role=status/polite and the handlers threw away the
+    JSON body, so a rejected request showed a bare "HTTP 400" and screen
+    readers never interrupted to announce it.
+    """
+
+    _REJECTED: ClassVar[dict] = {
+        "status": 400,
+        "json": {"error": {"message": "Google search-engine ID is required."}},
+    }
+
+    def _run(self, settings_script: str, invoke: str) -> HarnessResult:
+        return run_script(
+            settings_script,
+            initial_html=MIN_DOM,
+            fetch_map={**DEFAULT_FETCHES, "/api/settings/web-search": self._REJECTED},
+            invoke=invoke,
+        )
+
+    _READ_STATUS = """
+      const st = document.getElementById('web-search-status');
+      document.body.dataset.role = st.getAttribute('role') || '';
+      document.body.dataset.text = st.textContent || '';
+    """
+
+    def test_load_failure_surfaces_message_as_alert(self, settings_script: str) -> None:
+        result = self._run(
+            settings_script,
+            "await window.loadWebSearchSettings();" + self._READ_STATUS,
+        )
+        assert "Google search-engine ID is required." in result.dom
+        assert 'data-role="alert"' in result.dom
+
+    def test_save_failure_surfaces_message_as_alert(self, settings_script: str) -> None:
+        result = self._run(
+            settings_script,
+            "await window.saveWebSearchSettings();" + self._READ_STATUS,
+        )
+        assert "Google search-engine ID is required." in result.dom
+        assert 'data-role="alert"' in result.dom
+
+    def test_successful_load_clears_a_prior_alert(self, settings_script: str) -> None:
+        """A clean load must drop the stale error text and return the span to
+        the polite role — otherwise the alert sticks around forever."""
+        result = run_script(
+            settings_script,
+            initial_html=MIN_DOM,
+            fetch_map=DEFAULT_FETCHES,
+            invoke="""
+              const stale = document.getElementById('web-search-status');
+              stale.setAttribute('role', 'alert');
+              stale.textContent = 'stale failure text';
+              await window.loadWebSearchSettings();
+            """
+            + self._READ_STATUS,
+        )
+        _assert_clean_init(result)
+        assert 'data-role="status"' in result.dom
+        assert 'data-text=""' in result.dom

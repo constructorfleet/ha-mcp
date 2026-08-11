@@ -957,3 +957,60 @@ class TestBetaMasterAutoEnableInDevAddon:
             assert opts[key] is False, (
                 f"dev addon must default {key} to False (got {opts[key]!r})"
             )
+
+
+class TestSchemaOptionsReachTheServer:
+    """Every feature-flag option an addon schema exposes must actually be
+    mapped to its env var by ``start.py``.
+
+    ``enable_web_search`` was declared in the stable addon's options+schema
+    but never read in ``main()``, so the toggle rendered in the addon UI,
+    Supervisor persisted it — and nothing downstream ever saw it. The
+    server kept the pydantic default and ``ha_web_search`` was never
+    registered. This is a whole class of silent bug: the two halves live in
+    different files with nothing tying them together.
+    """
+
+    @staticmethod
+    def _schema_keys(flavor: str) -> set[str]:
+        import yaml
+
+        cfg = yaml.safe_load(
+            (Path(__file__).parents[2] / flavor / "config.yaml").read_text()
+        )
+        return set(cfg.get("schema", {}))
+
+    @pytest.mark.parametrize(
+        "flavor", ["homeassistant-addon", "homeassistant-addon-dev"]
+    )
+    def test_every_feature_flag_option_is_mapped_to_its_env_var(self, flavor):
+        import sys
+
+        sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
+        from ha_mcp.config import FEATURE_FLAG_FIELDS
+
+        source = (
+            Path(__file__).parents[2] / "homeassistant-addon" / "start.py"
+        ).read_text()
+        schema_keys = self._schema_keys(flavor)
+        # Both flavors run the SAME start.py (each Dockerfile copies
+        # homeassistant-addon/start.py), so one source read covers both.
+        missing = [
+            f"{f.field} -> {f.env}"
+            for f in FEATURE_FLAG_FIELDS
+            if f.field in schema_keys and f'os.environ["{f.env}"]' not in source
+        ]
+        assert not missing, (
+            f"{flavor}/config.yaml exposes options that start.py never maps "
+            f"to an env var, so toggling them does nothing: {missing}"
+        )
+
+    def test_web_search_option_is_declared_by_both_flavors(self):
+        """``enable_web_search`` is non-beta, so it belongs in both schemas —
+        that is what makes the unconditional env write in start.py correct
+        (a key absent from one schema needs the presence-gated treatment the
+        beta sub-flags get instead)."""
+        for flavor in ("homeassistant-addon", "homeassistant-addon-dev"):
+            assert "enable_web_search" in self._schema_keys(flavor), (
+                f"{flavor}/config.yaml must declare enable_web_search"
+            )
