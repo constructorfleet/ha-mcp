@@ -33,6 +33,7 @@ from ._handlers_server import (
 )
 from ._handlers_theme import build_theme_handlers
 from ._handlers_tools import build_tools_handlers
+from ._handlers_web_search import build_web_search_handlers
 from ._i18n import (
     LOCALE_COOKIE,
     build_payload,
@@ -444,6 +445,7 @@ def build_settings_handlers(
     handlers.update(build_backups_handlers(server))
     handlers.update(build_server_handlers(server, is_sidecar=is_sidecar))
     handlers.update(build_advanced_handlers(server))
+    handlers.update(build_web_search_handlers())
 
     return handlers
 
@@ -627,6 +629,8 @@ def register_settings_routes(
         # Advanced settings endpoints
         ("/api/settings/advanced", ["GET"], "get_advanced_settings"),
         ("/api/settings/advanced", ["POST"], "save_advanced_settings"),
+        ("/api/settings/web-search", ["GET"], "get_web_search"),
+        ("/api/settings/web-search", ["POST"], "save_web_search"),
         # Auto-backup endpoints (#1288)
         ("/api/settings/backups", ["GET"], "list_backups"),
         ("/api/settings/backups", ["DELETE"], "delete_backups_bulk"),
