@@ -368,6 +368,30 @@ For the HA add-on, the same option is documented in [`homeassistant-addon/DOCS.m
 
 ---
 
+## 🌐 Optional public web search
+
+HA-MCP can expose `ha_web_search` through **Kagi** or **Google Programmable
+Search**. It is off by default: set `ENABLE_WEB_SEARCH=true` or use the Web
+Search section of the settings dashboard, then restart the server and refresh
+your MCP client's tool list.
+
+The dashboard stores provider credentials encrypted at rest in HA-MCP's data
+directory. It only displays whether a credential is configured; it never
+returns or logs the key. Google needs both an API key and a Programmable Search
+Engine ID. Kagi needs an API key.
+
+The tool sends the query to the chosen provider and returns provider-supplied
+result snippets only. It does not retrieve result pages, synthesize summaries,
+or retain queries/results locally. Configure a default provider, a server-side
+result cap, safe-search On/Off, and result-domain allow/block lists in the
+dashboard. Safe search applies to both providers — it sets Google SafeSearch
+and Kagi's `safe_search` flag, each of which is on/off only. Bing and
+DuckDuckGo are not
+supported because they do not provide a suitable current public general-search
+API.
+
+---
+
 ## 🧪 Dev Channel
 
 Want early access to new features and fixes? Dev releases (`.devN`) are published on every push to master.

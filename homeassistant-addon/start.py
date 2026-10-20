@@ -528,6 +528,7 @@ def main() -> int:
     backup_hint = "normal"  # default
     custom_secret_path = ""  # default
     enable_tool_search = False  # default
+    enable_web_search = False  # default
     enable_tool_security_policies = False  # default
     read_only_mode = False  # default (discussion #1569 — non-beta, off by default)
     enable_yaml_config_editing = False  # default
@@ -593,6 +594,7 @@ def main() -> int:
             enable_tool_search = (
                 raw_tool_search if isinstance(raw_tool_search, bool) else False
             )
+            enable_web_search = resolve_bool_option(config, "enable_web_search", False)
             raw_tool_security_policies = config.get(
                 "enable_tool_security_policies", False
             )
@@ -767,6 +769,11 @@ def main() -> int:
     os.environ["HOMEASSISTANT_URL"] = "http://supervisor/core"
     os.environ["BACKUP_HINT"] = backup_hint
     os.environ["ENABLE_TOOL_SEARCH"] = str(enable_tool_search).lower()
+    # ENABLE_WEB_SEARCH is non-beta and in BOTH addon schemas, so it is
+    # written unconditionally like ENABLE_TOOL_SEARCH above. Without this
+    # write the schema option existed but never reached the server, so
+    # toggling it in the addon UI did not register ha_web_search.
+    os.environ["ENABLE_WEB_SEARCH"] = str(enable_web_search).lower()
     os.environ["ENABLE_TOOL_SECURITY_POLICIES"] = str(
         enable_tool_security_policies
     ).lower()

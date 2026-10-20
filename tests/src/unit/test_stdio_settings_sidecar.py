@@ -110,6 +110,9 @@ class TestBuildSettingsHandlers:
             # Entity visibility filter (#1728).
             "visibility_get_config",
             "visibility_put_config",
+            # Opt-in public web search.
+            "get_web_search",
+            "save_web_search",
         }
 
     def test_get_tools_reads_cache_when_server_is_none(

@@ -29,6 +29,12 @@ configuration:
       OpenAI-kompatible Modelle) oder mit kleineren Kontextfenstern. Tools werden
       via ha_search_tools gefunden und über kategorisierte Proxies ausgeführt
       (read/write/delete). Erfordert Neustart, um wirksam zu werden.
+  enable_web_search:
+    name: Öffentliche Websuche aktivieren
+    description: >-
+      Registriert nach einem Neustart das optionale Werkzeug ha_web_search.
+      Kagi-/Google-Zugangsdaten und Datenschutzoptionen werden im
+      HA-MCP-Einstellungsdashboard konfiguriert.
   enable_tool_security_policies:
     name: Tool Security Policies aktivieren (erweitert)
     description: >-
