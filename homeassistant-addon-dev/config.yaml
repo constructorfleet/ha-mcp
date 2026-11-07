@@ -24,6 +24,7 @@ image: "ghcr.io/homeassistant-ai/ha-mcp-addon-dev-{arch}"
 options:
   backup_hint: "normal"
   enable_tool_search: false
+  enable_web_search: false
   enable_tool_security_policies: false
   read_only_mode: false
   # Master beta gate — also dev-only (stable's schema does not declare
@@ -71,6 +72,7 @@ schema:
   backup_hint: list(strong|normal|weak|auto)
   secret_path: str?
   enable_tool_search: bool?
+  enable_web_search: bool?
   enable_tool_security_policies: bool?
   read_only_mode: bool?
   enable_beta_features: bool?

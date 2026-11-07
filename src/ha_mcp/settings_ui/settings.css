@@ -593,9 +593,10 @@
     font-size: 0.7rem; font-family: 'Roboto Mono', 'Courier New', monospace;
   }
   .adv-locked-note { font-size: 0.72rem; color: var(--warning); margin-top: 4px; font-style: italic; }
-  .adv-control { flex-shrink: 0; display: flex; align-items: center; }
+  .adv-control { flex-shrink: 0; display: flex; align-items: center; gap: 8px; }
   .adv-control input[type="text"],
   .adv-control input[type="number"],
+  .adv-control input[type="password"],
   .adv-control select {
     padding: 4px 8px; background: var(--bg); border: 1px solid var(--border);
     border-radius: 4px; color: var(--text); font-size: 0.875rem; font-family: inherit; min-width: 120px;
@@ -894,6 +895,7 @@
   .search,
   .adv-control input[type="text"],
   .adv-control input[type="number"],
+  .adv-control input[type="password"],
   .adv-control select,
   .feature-control input[type="number"],
   .backup-field-control input[type="number"],
@@ -911,6 +913,7 @@
   .search:hover,
   .adv-control input[type="text"]:hover,
   .adv-control input[type="number"]:hover,
+  .adv-control input[type="password"]:hover,
   .adv-control select:hover,
   .feature-control input[type="number"]:hover,
   .backup-field-control input[type="number"]:hover,
@@ -924,6 +927,7 @@
   .search:focus,
   .adv-control input[type="text"]:focus,
   .adv-control input[type="number"]:focus,
+  .adv-control input[type="password"]:focus,
   .adv-control select:focus,
   .feature-control input[type="number"]:focus,
   .backup-field-control input[type="number"]:focus,
@@ -961,6 +965,7 @@
     .feature-control,
     .adv-control { width: 100%; justify-content: flex-start; }
     .adv-control input[type="text"],
+    .adv-control input[type="password"],
     .adv-control select { width: 100%; }
 
     /* Backups: stack the row body above its actions; drop the desktop indents. */

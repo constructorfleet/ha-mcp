@@ -3757,6 +3757,166 @@ async function saveAdvancedSettings() {
 
 loadFeatureFlags();
 loadAdvancedSettings();
+
+function webSearchList(id) {
+  return document.getElementById(id).value.split(',').map(x => x.trim()).filter(Boolean);
+}
+
+let webSearchClearKagi = false;
+let webSearchClearGoogle = false;
+let webSearchBaseline = null;
+
+function webSearchSettingsSnapshot() {
+  return JSON.stringify({
+    enabled: document.getElementById('web-search-enabled').checked,
+    provider: document.getElementById('web-search-provider').value,
+    safe: document.getElementById('web-search-safe').value,
+    max: document.getElementById('web-search-max').value,
+    allow: document.getElementById('web-search-allow').value,
+    block: document.getElementById('web-search-block').value,
+  });
+}
+
+function updateWebSearchDirty() {
+  const dirty = webSearchSettingsSnapshot() !== webSearchBaseline
+    || document.getElementById('web-search-kagi-key').value !== ''
+    || document.getElementById('web-search-google-key').value !== ''
+    || document.getElementById('web-search-google-engine').value !== ''
+    || webSearchClearKagi
+    || webSearchClearGoogle;
+  document.getElementById('web-search-save').style.display = dirty ? '' : 'none';
+}
+
+// Pull the server's structured error message off a failed response so the
+// status line shows the actual reason (e.g. "engine_id is required for the
+// google provider") instead of a bare status code. Mirrors the
+// string-or-{message} shape the other settings flows already handle.
+async function webSearchErrorDetail(response) {
+  try {
+    const data = await response.json();
+    if (data && data.error) {
+      if (typeof data.error === 'string') return data.error;
+      if (data.error.message) return data.error.message;
+    }
+  } catch (_e) { /* non-JSON body — fall back to the status code */ }
+  return 'HTTP ' + response.status;
+}
+
+function webSearchFailure(status, message) {
+  setStatusAlert(status, true);
+  status.textContent = message;
+  showToast(message, {isError: true});
+}
+
+async function loadWebSearchSettings(forcedEnabled = undefined) {
+  const status = document.getElementById('web-search-status');
+  try {
+    const response = await fetch('./api/settings/web-search');
+    if (!response.ok) throw new Error(await webSearchErrorDetail(response));
+    const data = await response.json();
+    const enabled = forcedEnabled !== undefined ? forcedEnabled : data.enabled;
+    document.getElementById('web-search-enabled').checked = !!enabled;
+    document.getElementById('web-search-provider').value = data.default_provider;
+    document.getElementById('web-search-safe').value = data.safe_search;
+    document.getElementById('web-search-max').value = data.max_results;
+    document.getElementById('web-search-allow').value = (data.domain_allowlist || []).join(', ');
+    document.getElementById('web-search-block').value = (data.domain_blocklist || []).join(', ');
+    const configured = t('web_search.credentials.configured', {}, 'Configured (encrypted at rest)');
+    const notConfigured = t('web_search.credentials.not_configured', {}, 'Not configured');
+    document.getElementById('web-search-kagi-status').textContent = data.credentials.kagi ? configured : notConfigured;
+    document.getElementById('web-search-google-status').textContent = data.credentials.google ? configured : notConfigured;
+    webSearchBaseline = webSearchSettingsSnapshot();
+    updateWebSearchDirty();
+    // A prior failure may have left the span as role=alert with stale error
+    // text; a clean load clears both.
+    setStatusAlert(status, false);
+    status.textContent = '';
+    return true;
+  } catch (error) {
+    webSearchFailure(status, 'Could not load web-search settings: ' + error.message);
+    return false;
+  }
+}
+
+async function saveWebSearchSettings() {
+  const status = document.getElementById('web-search-status');
+  const kagiKey = document.getElementById('web-search-kagi-key').value;
+  const googleKey = document.getElementById('web-search-google-key').value;
+  const googleEngine = document.getElementById('web-search-google-engine').value;
+  const payload = {
+    enabled: document.getElementById('web-search-enabled').checked,
+    default_provider: document.getElementById('web-search-provider').value,
+    safe_search: document.getElementById('web-search-safe').value,
+    max_results: Number(document.getElementById('web-search-max').value),
+    domain_allowlist: webSearchList('web-search-allow'),
+    domain_blocklist: webSearchList('web-search-block'),
+  };
+  const credentials = {};
+  if (kagiKey) credentials.kagi = {api_key: kagiKey};
+  if (googleKey || googleEngine) credentials.google = {api_key: googleKey, engine_id: googleEngine};
+  if (webSearchClearKagi) credentials.kagi = {clear: true};
+  if (webSearchClearGoogle) credentials.google = {clear: true};
+  if (Object.keys(credentials).length) payload.credentials = credentials;
+  try {
+    // Persist (and validate) provider settings BEFORE flipping the feature
+    // flag: the two writes hit different endpoints with no transaction, so if
+    // the flag were flipped first a rejected settings save would leave web
+    // search enabled with no valid provider configured.
+    const response = await fetch('./api/settings/web-search', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)});
+    if (!response.ok) throw new Error(await webSearchErrorDetail(response));
+    let enabledChanged = true;
+    if (webSearchBaseline) {
+      try {
+        enabledChanged = payload.enabled !== JSON.parse(webSearchBaseline).enabled;
+      } catch (_e) {
+        enabledChanged = true;
+      }
+    }
+    if (enabledChanged) {
+      const featureResponse = await fetch('./api/settings/features', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({flags: {enable_web_search: payload.enabled}})});
+      if (!featureResponse.ok) throw new Error('could not update web-search enablement (' + await webSearchErrorDetail(featureResponse) + ')');
+    }
+    markRestartRequired();
+    document.getElementById('web-search-kagi-key').value = '';
+    document.getElementById('web-search-google-key').value = '';
+    document.getElementById('web-search-google-engine').value = '';
+    webSearchClearKagi = false;
+    webSearchClearGoogle = false;
+    // Reload first: it clears the status span, so the confirmation has to be
+    // written afterwards or it gets wiped. If the reload itself failed it has
+    // already put its own error in the span — don't paper over it, but still
+    // toast the save, which did succeed.
+    const reloaded = await loadWebSearchSettings(payload.enabled);
+    if (reloaded) status.textContent = 'Saved. Restart required.';
+    showToast('Saved. Restart required.');
+  } catch (error) {
+    webSearchFailure(status, 'Save failed: ' + error.message);
+  }
+}
+
+document.getElementById('web-search-save').addEventListener('click', saveWebSearchSettings);
+document.getElementById('web-search-clear-kagi').addEventListener('click', () => { webSearchClearKagi = true; document.getElementById('web-search-kagi-key').value = ''; updateWebSearchDirty(); });
+document.getElementById('web-search-clear-google').addEventListener('click', () => { webSearchClearGoogle = true; document.getElementById('web-search-google-key').value = ''; document.getElementById('web-search-google-engine').value = ''; updateWebSearchDirty(); });
+['web-search-enabled', 'web-search-provider', 'web-search-safe'].forEach((id) => {
+  document.getElementById(id).addEventListener('change', updateWebSearchDirty);
+});
+// Typing a new secret after clicking Clear cancels the pending clear —
+// otherwise the save still sends {clear: true} and silently discards the
+// credential the user just entered.
+function webSearchCredentialInput(id) {
+  if (document.getElementById(id).value !== '') {
+    if (id === 'web-search-kagi-key') webSearchClearKagi = false;
+    if (id === 'web-search-google-key' || id === 'web-search-google-engine') webSearchClearGoogle = false;
+  }
+  updateWebSearchDirty();
+}
+['web-search-max', 'web-search-allow', 'web-search-block'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', updateWebSearchDirty);
+});
+['web-search-kagi-key', 'web-search-google-key', 'web-search-google-engine'].forEach((id) => {
+  document.getElementById(id).addEventListener('input', () => webSearchCredentialInput(id));
+});
+loadWebSearchSettings();
 loadTools();
 loadFsCustomPaths();
 

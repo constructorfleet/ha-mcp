@@ -142,6 +142,10 @@ class Settings(BaseSettings):
     # Dramatically reduces idle context token usage for LLMs.
     enable_tool_search: bool = Field(False, alias="ENABLE_TOOL_SEARCH")
 
+    # Public web search is deliberately opt-in: a query leaves the local
+    # Home Assistant network for the configured search provider.
+    enable_web_search: bool = Field(False, alias="ENABLE_WEB_SEARCH")
+
     # Tool security policies middleware — opt-in gate that routes high-stakes
     # tool calls through a per-tool policy with out-of-band web-UI approval
     # (issue #966). Disabled by default.
@@ -665,6 +669,7 @@ class AdvancedField(NamedTuple):
 FEATURE_FLAG_FIELDS: tuple[FeatureFlagField, ...] = (
     FeatureFlagField("enable_beta_features", "ENABLE_BETA_FEATURES", bool),
     FeatureFlagField("enable_tool_search", "ENABLE_TOOL_SEARCH", bool),
+    FeatureFlagField("enable_web_search", "ENABLE_WEB_SEARCH", bool),
     FeatureFlagField("tool_search_max_results", "TOOL_SEARCH_MAX_RESULTS", int),
     FeatureFlagField(
         "enable_tool_security_policies", "ENABLE_TOOL_SECURITY_POLICIES", bool
